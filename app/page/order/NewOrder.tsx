@@ -1,6 +1,6 @@
 import { useText } from '@/app/_layout';
 
-export default function App() {
+export default function NewOrder() {
   const Text = useText();
 
   return (
