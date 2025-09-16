@@ -1,11 +1,12 @@
 import { useText } from "@/app/_layout";
 import {
-  FlatList,
-  ListRenderItemInfo,
-  Text as RNText,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    ListRenderItemInfo,
+    Text as RNText,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 interface Product {
@@ -37,16 +38,22 @@ const data: Order[] = [
   },
 ];
 
-export default function NewOrder() {
+export default function SendOrder() {
   const Text = useText();
 
-  const renderOrder = ({ item }: ListRenderItemInfo<Order>) => (
+  const handleSendOrder = (orderId: string) => {
+    Alert.alert("ส่งออเดอร์", `ส่งออเดอร์บิลเลขที่ ${orderId} เรียบร้อยแล้ว`);
+    // TODO: เรียก API ส่งออเดอร์ที่นี่
+  };
+
+  const renderOrder = ({ item, index }: ListRenderItemInfo<Order>) => (
     <View style={styles.orderContainer}>
       {/* Header บิล */}
       <View style={styles.orderHeader}>
         <Text style={styles.orderTitle}>บิลเลขที่: {item.id}</Text>
         <Text style={styles.orderTime}>16:00</Text>
       </View>
+
       {/* Table Header */}
       <View style={[styles.row, styles.header]}>
         <Text style={styles.cell}>รายการ</Text>
@@ -75,15 +82,14 @@ export default function NewOrder() {
       </View>
 
       {/* แสดงปุ่มเฉพาะบิลแรก */}
-
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={[styles.button, styles.acceptButton]}>
-          <RNText style={styles.buttonText}>รับ</RNText>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, styles.cancelButton]}>
-          <RNText style={styles.buttonText}>ยกเลิก</RNText>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.sendButton]}
+            onPress={() => handleSendOrder(item.id)}
+          >
+            <RNText style={styles.buttonText}>ส่งออเดอร์</RNText>
+          </TouchableOpacity>
+        </View>
     </View>
   );
 
@@ -92,6 +98,8 @@ export default function NewOrder() {
       data={data}
       keyExtractor={(item) => item.id}
       renderItem={renderOrder}
+      contentContainerStyle={{ paddingBottom: 20 }}
+      showsVerticalScrollIndicator={false}
     />
   );
 }
@@ -105,9 +113,19 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "#fff",
   },
+  orderHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+  },
   orderTitle: {
     fontWeight: "bold",
     marginBottom: 5,
+  },
+  orderTime: {
+    fontSize: 14,
+    color: "#666",
   },
   row: {
     flexDirection: "row",
@@ -127,7 +145,7 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "center",
     marginTop: 10,
   },
   button: {
@@ -137,24 +155,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: "center",
   },
-  acceptButton: {
+  sendButton: {
     backgroundColor: "#1E7D37",
-  },
-  cancelButton: {
-    backgroundColor: "#C42127",
   },
   buttonText: {
     color: "#fff",
     fontWeight: "bold",
-  },
-  orderHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-  orderTime: {
-    fontSize: 14,
-    color: "#666",
   },
 });

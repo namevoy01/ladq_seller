@@ -1,9 +1,11 @@
 import { useText } from '@/app/_layout';
 import NewOrder from '@/app/page/order/NewOrder';
+import SendOrder from '@/app/page/order/SendOrder';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useState } from 'react';
 import { BackHandler, Dimensions, FlatList, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import SlideButton from '../../../components/order/SlideButton';
+
 type Order = {
   id: string;
   customer: string;
@@ -118,7 +120,7 @@ export default function OrderScreen() {
                 index === 1 && { marginStart: 5, marginEnd: 5 }
               ]}
             >
-              <Text style={[styles.text, { color: isActive ? '#fff' : '#000', fontFamily: 'KanitBlack' }]}>
+              <Text style={[styles.text, { color: isActive ? '#fff' : '#000', fontFamily: 'Kanit' }]}>
                 {label}
               </Text>
             </TouchableOpacity>
@@ -155,8 +157,8 @@ export default function OrderScreen() {
 
             </View>
               ;
-          case 1:
-            return <Text>ยังไม่มีออเดอร์</Text>;
+          case 1: 
+            return (<SendOrder/>);
           case 2:
             return (
               <NewOrder />
