@@ -142,11 +142,9 @@ export default function OrderScreen() {
                   thumbColor="#fff"
                   style={{ transform: [{ scaleX: 1.5 }, { scaleY: 1.5 }], marginTop: 5, marginBottom: 5, marginStart: 8 }} // ขยาย 1.5 เท่า
                 />
-                {/* <Text style={styles.switchLabel}>{isSwitchOn ? "เปิด" : "ปิด"}</Text> */}
 
               </View>
 
-              {/* รายการออเดอร์ */}
               <FlatList
                 data={mockOrders}
                 keyExtractor={(item) => item.id}
@@ -158,7 +156,7 @@ export default function OrderScreen() {
             </View>
               ;
           case 1:
-            return <Text>ยังไม่มีออเดอร์</Text>; // คุณใส่อะไรแทนก็ได้
+            return <Text>ยังไม่มีออเดอร์</Text>;
           case 2:
             return (
               <NewOrder />
@@ -282,20 +280,20 @@ const styles = StyleSheet.create({
   summaryDone: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#16a34a', // เขียว
+    color: '#16a34a',
     flex: 1,
   },
   summaryPending: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#dc2626', // แดง
+    color: '#dc2626',
     textAlign: 'right',
     flex: 1,
   },
   summaryTotal: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151', // เทาเข้ม
+    color: '#374151',
     textAlign: 'left',
   },
   switchRow: {
@@ -311,10 +309,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   switchOn: {
-    backgroundColor: "#C42127", // เปิด = แดง
+    backgroundColor: "#C42127",
   },
   switchOff: {
-    backgroundColor: "#d1d5db", // ปิด = เทา
+    backgroundColor: "#d1d5db",
   },
   switchText: {
     color: "#fff",
