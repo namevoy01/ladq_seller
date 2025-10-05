@@ -3,7 +3,17 @@ import NewOrder from '@/app/page/order/NewOrder';
 import SendOrder from '@/app/page/order/SendOrder';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useState } from 'react';
-import { BackHandler, Dimensions, FlatList, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import {
+  BackHandler,
+  Dimensions,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import SlideButton from '../../../components/order/SlideButton';
 
 type Order = {
@@ -33,35 +43,40 @@ const { height } = Dimensions.get('window');
 export default function OrderScreen() {
   const [selected, setSelected] = useState(0);
   const buttons = ["ออเดอร์", "ออเดอร์รอส่ง", "ออเดอร์ใหม่"];
-  const Text = useText(); // ใช้ custom Text จาก _layout
+  const TextComponent = useText(); // ใช้ custom Text
   const [isSwitchOn, setIsSwitchOn] = useState(false);
 
   // ปิด hardware back button ของ Android
   useFocusEffect(
     React.useCallback(() => {
-      const onBackPress = () => true; // true = ป้องกันกลับ
+      const onBackPress = () => true;
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-      return () => subscription.remove(); // <- ใช้ .remove() ไม่ใช่ removeEventListener
+      return () => subscription.remove();
     }, [])
   );
 
+  // แปลง status เป็นข้อความ
+  const statusText = (status: Order['status']) => {
+    switch (status) {
+      case 'pending': return 'รอรับออเดอร์';
+      case 'in-progress': return 'กำลังทำ';
+      case 'done': return 'เสร็จสิ้น';
+    }
+  };
 
   const renderOrder = ({ item }: { item: Order }) => (
     <View style={{ marginBottom: 16 }}>
-      {/* Card */}
       <View style={styles.card}>
-        {/* ID */}
-        <Text style={[styles.id, { fontFamily: 'KanitBlack' }]}>{item.id}</Text>
+        <Text style={styles.id}>{item.id}</Text>
 
-        {/* Header ตาราง */}
+        {/* Header row */}
         <View style={styles.headerRow}>
           <Text style={[styles.headerText, { flex: 3, textAlign: 'left', paddingLeft: 20 }]}>รายการ</Text>
           <Text style={[styles.headerText, { flex: 2, textAlign: 'center' }]}>จำนวน</Text>
           <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>ราคา</Text>
         </View>
 
-        {/* รายการสินค้า Scrollable ถ้ามาก */}
+        {/* Items */}
         <ScrollView style={{ maxHeight: height * 0.43 }}>
           {item.items.map((it, index) => (
             <View key={index} style={styles.itemRow}>
@@ -72,12 +87,13 @@ export default function OrderScreen() {
           ))}
         </ScrollView>
 
-        {/* สถานะ */}
-        <Text style={[styles.status, { fontFamily: 'KanitBlack', paddingLeft: 20 }]}>
+        {/* Status */}
+        <Text style={[styles.status, { paddingLeft: 20 }]}>
           รายละเอียดเพิ่มเติม : {statusText(item.status)}
         </Text>
       </View>
 
+      {/* Cancel button */}
       <TouchableOpacity
         style={styles.cancelButton}
         onPress={() => alert(`ยกเลิกออเดอร์ ${item.id}`)}
@@ -85,11 +101,13 @@ export default function OrderScreen() {
         <Text style={styles.cancelText}>ยกเลิก</Text>
       </TouchableOpacity>
 
-      {/* SlideButton ใต้ Card */}
+      {/* Slide button */}
       <SlideButton
         height={60}
         onSlideComplete={() => alert(`ยืนยันออเดอร์ ${item.id} เรียบร้อย!`)}
       />
+
+      {/* Summary */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryDone}>ออเดอร์ที่สำเร็จแล้ว: 30</Text>
@@ -101,10 +119,8 @@ export default function OrderScreen() {
   );
 
   return (
-
     <View style={styles.container}>
-      {/* ปุ่มเลือก */}
-
+      {/* Top buttons */}
       <View style={styles.buttonRow}>
         {buttons.map((label, index) => {
           const isActive = selected === index;
@@ -120,67 +136,42 @@ export default function OrderScreen() {
                 index === 1 && { marginStart: 5, marginEnd: 5 }
               ]}
             >
-              <Text style={[styles.text, { color: isActive ? '#fff' : '#000', fontFamily: 'Kanit' }]}>
-                {label}
-              </Text>
+              <Text style={[styles.text, { color: isActive ? '#fff' : '#000' }]}>{label}</Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
+      {/* Content */}
+      {selected === 0 && (
+        <View>
+          {/* Switch row */}
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>{isSwitchOn ? 'เปิดรับออเดอร์อัตโนมัติ' : 'ปิดรับออเดอร์อัตโนมัติ'}</Text>
+            <Switch
+              value={isSwitchOn}
+              onValueChange={setIsSwitchOn}
+              trackColor={{ false: "#d1d5db", true: "#C42127" }}
+              thumbColor="#fff"
+              style={{ transform: [{ scaleX: 1.5 }, { scaleY: 1.5 }], marginStart: 8 }}
+            />
+          </View>
 
+          {/* Orders list */}
+          <FlatList
+            data={mockOrders}
+            keyExtractor={(item) => item.id}
+            renderItem={renderOrder}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          />
+        </View>
+      )}
 
-      {(() => {
-        switch (selected) {
-          case 0:
-            return <View>
-              <View style={styles.switchRow}>
-                <Text>รับออเดอร์อัตโนมัติ</Text>
-
-                <Switch
-                  value={isSwitchOn}
-                  onValueChange={setIsSwitchOn}
-                  trackColor={{ false: "#d1d5db", true: "#C42127" }}
-                  thumbColor="#fff"
-                  style={{ transform: [{ scaleX: 1.5 }, { scaleY: 1.5 }], marginTop: 5, marginBottom: 5, marginStart: 8 }} // ขยาย 1.5 เท่า
-                />
-
-              </View>
-
-              <FlatList
-                data={mockOrders}
-                keyExtractor={(item) => item.id}
-                renderItem={renderOrder}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 20 }}
-              />
-
-            </View>
-              ;
-          case 1: 
-            return (<SendOrder/>);
-          case 2:
-            return (
-              <NewOrder />
-            );
-          default:
-            return null;
-        }
-      })()}
-
+      {selected === 1 && <SendOrder />}
+      {selected === 2 && <NewOrder />}
     </View>
   );
-}
-
-function statusText(status: Order['status']) {
-  switch (status) {
-    case 'pending':
-      return 'รอรับออเดอร์';
-    case 'in-progress':
-      return 'กำลังทำ';
-    case 'done':
-      return 'เสร็จสิ้น';
-  }
 }
 
 const styles = StyleSheet.create({
@@ -189,6 +180,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
     padding: 16,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: height * 0.05,
+    marginBottom: 12,
+  },
+  button: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  text: {
+    fontSize: 16,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    justifyContent: 'flex-start',
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -196,7 +213,7 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
     overflow: 'hidden',
     paddingBottom: 10,
-    height: height * 0.43
+    height: height * 0.43,
   },
   id: {
     fontSize: 18,
@@ -215,47 +232,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.24)',
   },
-  headerText: {
-    fontSize: 16,
-  },
+  headerText: { fontSize: 16 },
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  customer: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  items: {
-    fontSize: 16,
-    color: '#374151',
-  },
-  price: {
-    fontSize: 16,
-    color: '#374151',
-  },
-  status: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 8,
-  },
-  button: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    marginTop: "15%",
-  },
-  text: {
-    fontSize: 16,
-  },
+  customer: { fontSize: 16, color: '#374151', fontWeight: '600' },
+  items: { fontSize: 16, color: '#374151' },
+  price: { fontSize: 16, color: '#374151' },
+  status: { fontSize: 14, color: '#6b7280', marginTop: 8 },
   cancelButton: {
     marginTop: 10,
     backgroundColor: '#C42127',
@@ -265,60 +251,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  cancelText: {
-    color: '#F9FBFF', // สีแดง
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  summaryContainer: {
-    paddingTop: 6,
-    paddingStart: 6,
-    paddingEnd: 6,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryDone: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#16a34a',
-    flex: 1,
-  },
-  summaryPending: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#dc2626',
-    textAlign: 'right',
-    flex: 1,
-  },
-  summaryTotal: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'left',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  customSwitch: {
-    width: 100,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  switchOn: {
-    backgroundColor: "#C42127",
-  },
-  switchOff: {
-    backgroundColor: "#d1d5db",
-  },
-  switchText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
+  cancelText: { color: '#F9FBFF', fontSize: 16, fontWeight: 'bold' },
+  summaryContainer: { paddingTop: 6, paddingHorizontal: 6 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  summaryDone: { fontSize: 14, fontWeight: '600', color: '#16a34a', flex: 1 },
+  summaryPending: { fontSize: 14, fontWeight: '600', color: '#dc2626', textAlign: 'right', flex: 1 },
+  summaryTotal: { fontSize: 14, fontWeight: '600', color: '#374151', textAlign: 'left' },
 });

@@ -1,13 +1,5 @@
 import { useText } from "@/app/_layout";
-import {
-    Alert,
-    FlatList,
-    ListRenderItemInfo,
-    Text as RNText,
-    StyleSheet,
-    TouchableOpacity,
-    View,
-} from "react-native";
+import { Alert, FlatList, ListRenderItemInfo, Text as RNText, StyleSheet, TouchableOpacity, View } from "react-native";
 
 interface Product {
   name: string;
@@ -46,27 +38,27 @@ export default function SendOrder() {
     // TODO: เรียก API ส่งออเดอร์ที่นี่
   };
 
-  const renderOrder = ({ item, index }: ListRenderItemInfo<Order>) => (
+  const renderOrder = ({ item }: ListRenderItemInfo<Order>) => (
     <View style={styles.orderContainer}>
       {/* Header บิล */}
       <View style={styles.orderHeader}>
-        <Text style={styles.orderTitle}>บิลเลขที่: {item.id}</Text>
-        <Text style={styles.orderTime}>16:00</Text>
+        <RNText style={styles.orderTitle}>บิลเลขที่: {item.id}</RNText>
+        <RNText style={styles.orderTime}>16:00</RNText>
       </View>
 
       {/* Table Header */}
       <View style={[styles.row, styles.header]}>
-        <Text style={styles.cell}>รายการ</Text>
-        <Text style={styles.cell}>จำนวน</Text>
-        <Text style={styles.cell}>ราคา</Text>
+        <RNText style={styles.cell}>รายการ</RNText>
+        <RNText style={styles.cell}>จำนวน</RNText>
+        <RNText style={styles.cell}>ราคา</RNText>
       </View>
 
       {/* Table Rows */}
       {item.items.map((it, i) => (
         <View style={styles.row} key={i}>
-          <Text style={styles.cell}>{it.name}</Text>
-          <Text style={styles.cell}>{it.qty}</Text>
-          <Text style={styles.cell}>{it.price}</Text>
+          <RNText style={styles.cell}>{it.name}</RNText>
+          <RNText style={styles.cell}>{it.qty}</RNText>
+          <RNText style={styles.cell}>{it.price}</RNText>
         </View>
       ))}
 
@@ -81,15 +73,15 @@ export default function SendOrder() {
         </RNText>
       </View>
 
-      {/* แสดงปุ่มเฉพาะบิลแรก */}
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[styles.button, styles.sendButton]}
-            onPress={() => handleSendOrder(item.id)}
-          >
-            <RNText style={styles.buttonText}>ส่งออเดอร์</RNText>
-          </TouchableOpacity>
-        </View>
+      {/* ปุ่มส่งออเดอร์ */}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.button, styles.sendButton]}
+          onPress={() => handleSendOrder(item.id)}
+        >
+          <RNText style={styles.buttonText}>ส่งออเดอร์</RNText>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -107,21 +99,21 @@ export default function SendOrder() {
 const styles = StyleSheet.create({
   orderContainer: {
     margin: 10,
-    padding: 10,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 6,
-    backgroundColor: "#fff",
   },
   orderHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 5,
+    marginBottom: 8,
   },
   orderTitle: {
     fontWeight: "bold",
-    marginBottom: 5,
+    fontSize: 16,
   },
   orderTime: {
     fontSize: 14,
@@ -129,9 +121,10 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderColor: "#eee",
-    paddingVertical: 6,
+    alignItems: "center",
   },
   header: {
     backgroundColor: "#f0f0f0",
@@ -142,6 +135,7 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
     textAlign: "center",
+    fontSize: 14,
   },
   buttonRow: {
     flexDirection: "row",
