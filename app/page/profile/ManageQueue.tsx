@@ -35,7 +35,6 @@ export default function ManageQueue() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        {/* Header + Switch */}
         <View style={styles.headerRow}>
           <Text style={styles.cardTitle}>จัดการคิว</Text>
           <View style={styles.switchContainer}>
@@ -43,13 +42,10 @@ export default function ManageQueue() {
             <Switch
               value={isQueueOpen}
               onValueChange={setIsQueueOpen}
-              trackColor={{ false: '#ccc', true: '#4caf50' }}
-              thumbColor="#fff"
             />
           </View>
         </View>
 
-        {/* จำนวนคิวสูงสุด */}
         <Text style={styles.sectionLabel}>จำนวนคิวสูงสุด</Text>
         <View style={styles.pickerContainer}>
           <Picker
@@ -63,8 +59,7 @@ export default function ManageQueue() {
           </Picker>
         </View>
 
-        {/* ช่วงเวลาต่อรอบ */}
-        <Text style={[styles.sectionLabel, { marginTop: 20 }]}>ช่วงเวลาต่อรอบ</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 16 }]}>ช่วงเวลาต่อรอบ</Text>
         <View style={styles.pickerContainer}>
           <Picker
             selectedValue={roundsPerHour}
@@ -77,13 +72,11 @@ export default function ManageQueue() {
           </Picker>
         </View>
 
-        {/* Save Button */}
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85}>
           <Text style={styles.saveText}>บันทึกการตั้งค่า</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Modal Alert */}
       <Modal
         visible={modalVisible}
         transparent
@@ -101,6 +94,7 @@ export default function ManageQueue() {
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() => setModalVisible(false)}
+              activeOpacity={0.85}
             >
               <Text style={styles.modalButtonText}>ตกลง</Text>
             </TouchableOpacity>
@@ -112,30 +106,36 @@ export default function ManageQueue() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, padding: 20, backgroundColor: '#f2f4f7' },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.06,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  cardTitle: { fontSize: 22, fontWeight: 'bold', color: '#333' },
+  cardTitle: { fontSize: 20, fontWeight: '700', color: '#1f2937' },
   switchContainer: { flexDirection: 'row', alignItems: 'center' },
-  switchLabel: { marginRight: 10, fontSize: 16, fontWeight: '500', color: '#555' },
-  sectionLabel: { fontSize: 16, color: '#555', marginBottom: 8, fontWeight: '500' },
-  pickerContainer: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, overflow: 'hidden', backgroundColor: '#fafafa' },
+  switchLabel: { marginRight: 10, fontSize: 14, fontWeight: '600', color: '#4b5563' },
+  sectionLabel: { fontSize: 14, color: '#4b5563', marginBottom: 8, fontWeight: '600' },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f9fafb',
+  },
   picker: { height: 50, width: '100%' },
-  saveButton: { marginTop: 30, backgroundColor: '#4caf50', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  saveText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  saveButton: { marginTop: 24, backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  saveText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   modalBackground: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalCard: { width: '80%', backgroundColor: '#fff', borderRadius: 16, padding: 20, alignItems: 'center' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
-  modalText: { fontSize: 16, marginBottom: 20, textAlign: 'center' },
-  modalButton: { backgroundColor: '#4caf50', paddingHorizontal: 30, paddingVertical: 10, borderRadius: 10 },
-  modalButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  modalCard: { width: '82%', backgroundColor: '#fff', borderRadius: 16, padding: 20, alignItems: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: '800', marginBottom: 10, color: '#111827' },
+  modalText: { fontSize: 16, marginBottom: 20, textAlign: 'center', color: '#374151' },
+  modalButton: { backgroundColor: '#16a34a', paddingHorizontal: 30, paddingVertical: 10, borderRadius: 12 },
+  modalButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });

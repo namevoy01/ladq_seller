@@ -1,24 +1,25 @@
 import React, { useState } from 'react';
 import {
-  Dimensions,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
-export default function CreateStore() {
+export default function ClaimStore() {
   const { width } = Dimensions.get('window');
-  const [activeTab, setActiveTab] = useState('create');
+  const [activeTab, setActiveTab] = useState('claim');
   
   const getMarginHorizontal = () => {
     return width < 400 ? 5 : 8;
   };
+  
   const [storeInfo, setStoreInfo] = useState({
     storeName: '',
     storeType: '',
@@ -165,9 +166,7 @@ export default function CreateStore() {
 
         {/* Submit Button */}
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>
-            {activeTab === 'create' ? 'สร้างร้านค้า' : 'เคลมร้านค้า'}
-          </Text>
+          <Text style={styles.submitButtonText}>เคลมร้านค้า</Text>
         </TouchableOpacity>
       </ScrollView>
       </SafeAreaView>

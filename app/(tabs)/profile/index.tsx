@@ -1,12 +1,45 @@
 import Layout from "@/components/orther/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { Image, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { useRouter, type Href } from "expo-router";
+import React, { useRef, useState } from "react";
+import { Alert, Image, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 
 export default function ProfileScreen() {
   const [isOpen, setIsOpen] = useState(true);
   const router = useRouter();
+  const { logout } = useAuth();
+  const isNavigatingRef = useRef(false);
+
+  const guardedPush = (path: Href) => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    router.push(path);
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 700);
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      "ออกจากระบบ",
+      "คุณต้องการออกจากระบบหรือไม่?",
+      [
+        {
+          text: "ยกเลิก",
+          style: "cancel",
+        },
+        {
+          text: "ออกจากระบบ",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+            router.replace("/");
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <Layout>
@@ -20,7 +53,6 @@ export default function ProfileScreen() {
           <Text style={styles.shopName}>ร้านก๋วยเตี๋ยวป้าแดง</Text>
           <Text style={styles.shopTime}>เวลาเปิด–ปิด: 09:00 - 20:00</Text>
 
-          {/* Switch พร้อมข้อความ */}
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>{isOpen ? "เปิดร้าน" : "ปิดร้าน"}</Text>
             <Switch value={isOpen} onValueChange={setIsOpen} />
@@ -28,28 +60,32 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Card */}
       <View style={styles.card}>
         <Text style={styles.cardHeader}>ตั้งค่าโปรไฟล์</Text>
 
         <MenuItem
-          icon={<MaterialIcons name="queue" size={22} color="#333" />}
+          icon={<MaterialIcons name="queue" size={22} color="#1f2937" />}
           label="ตั้งค่าการจัดการคิว"
-          onPress={() => router.push("/page/profile/ManageQueue")} />
+          onPress={() => guardedPush("/page/profile/ManageQueue")} />
 
         <MenuItem
-          icon={<MaterialIcons name="restaurant-menu" size={22} color="#333" />}
+          icon={<MaterialIcons name="restaurant-menu" size={22} color="#1f2937" />}
           label="ตั้งค่าเมนูในร้าน"
-          onPress={() => router.push("/page/profile/SettingMenu")} />
+          onPress={() => guardedPush("/page/profile/SettingMenu")} />
 
         <MenuItem
-          icon={<MaterialIcons name="storefront" size={22} color="#333" />}
+          icon={<MaterialIcons name="storefront" size={22} color="#1f2937" />}
           label="ข้อมูลร้านค้า / แก้ไขร้านค้า"
-        />
+          onPress={() => guardedPush("/page/profile/InfoStore")} />
         <MenuItem
-          icon={<MaterialIcons name="payment" size={22} color="#333" />}
+          icon={<MaterialIcons name="payment" size={22} color="#1f2937" />}
           label="ช่องทางการรับเงิน / แก้ไข"
-        />
+          onPress={() => guardedPush("/page/profile/Payment")} />
+        
+        <MenuItem
+          icon={<MaterialIcons name="logout" size={22} color="#dc2626" />}
+          label="ออกจากระบบ"
+          onPress={handleLogout} />
       </View>
     </Layout>
   );
@@ -57,10 +93,10 @@ export default function ProfileScreen() {
 
 function MenuItem({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress?: () => void }) {
   return (
-    <TouchableOpacity style={styles.item} onPress={onPress}>
+    <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.iconBox}>{icon}</View>
       <Text style={styles.itemText} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
-      <MaterialIcons name="chevron-right" size={24} color="#aaa" />
+      <MaterialIcons name="chevron-right" size={22} color="#9ca3af" />
     </TouchableOpacity>
   );
 }
@@ -68,14 +104,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
     backgroundColor: "#fff",
     padding: 12,
-    borderRadius: 12,
-    elevation: 2,
+    borderRadius: 16,
+    elevation: 3,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
   },
   profileImage: {
     width: 70,
@@ -84,46 +121,49 @@ const styles = StyleSheet.create({
   },
   shopName: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "700",
     marginBottom: 4,
+    color: "#111827",
   },
   shopTime: {
     fontSize: 14,
-    color: "#555",
+    color: "#6b7280",
     marginBottom: 8,
   },
   switchRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    gap: 8, // ช่องว่างระหว่างข้อความกับ switch
+    gap: 8,
   },
   switchLabel: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#333",
+    fontWeight: "600",
+    color: "#374151",
   },
   card: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 12,
-    elevation: 2,
+    elevation: 3,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
   },
   cardHeader: {
     fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 12,
+    fontWeight: "700",
+    marginBottom: 6,
+    color: "#111827",
   },
   item: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#f1f5f9",
   },
   iconBox: {
     width: 28,
@@ -133,5 +173,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     marginLeft: 10,
+    color: "#1f2937",
+    fontWeight: "600",
   },
 });

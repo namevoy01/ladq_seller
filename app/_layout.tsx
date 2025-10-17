@@ -6,6 +6,7 @@ import React, { createContext, useContext } from 'react';
 import { Text as RNText, TextProps } from 'react-native';
 import 'react-native-reanimated';
 
+import { AuthProvider } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 // 1️⃣ Context สำหรับ Text component
@@ -35,14 +36,16 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
-    <FontContext.Provider value={CustomText}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </FontContext.Provider>
+    <AuthProvider>
+      <FontContext.Provider value={CustomText}>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </FontContext.Provider>
+    </AuthProvider>
   );
 }
