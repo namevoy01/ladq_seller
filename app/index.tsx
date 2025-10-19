@@ -60,36 +60,7 @@ export default function LoginScreen() {
     return '+66' + digits;
   };
 
-  // Function to create JWT token based on user phone (for testing)
-  const createJWTForUser = (phone: string) => {
-    // Different merchant IDs for different users (for testing)
-    const userMerchantMap: { [key: string]: string } = {
-      '+66943341222': '2b496b08-c37a-44ee-a34f-58636dfb74d5', // User 1
-      '+66812345678': '3c597c19-d48b-55ff-b45g-69747egc85e6', // User 2
-      '+66987654321': '4d608d20-e59c-66gg-c56h-70858fhd96f7', // User 3
-    };
-
-    const merchantId = userMerchantMap[phone] || '2b496b08-c37a-44ee-a34f-58636dfb74d5'; // Default
-    
-    // Create JWT payload
-    const payload = {
-      id: `user-${Date.now()}-${phone.replace('+', '')}`,
-      role: "seller",
-      branch_id: `branch-${Date.now()}-${phone.replace('+', '')}`,
-      merchant_id: merchantId,
-      phone: phone,
-      iss: "seller",
-      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
-    };
-
-    // For testing, we'll create a simple base64 encoded token
-    // In production, this should be done by the backend
-    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-    const payloadEncoded = btoa(JSON.stringify(payload));
-    const signature = btoa("test-signature");
-    
-    return `${header}.${payloadEncoded}.${signature}`;
-  };
+  // remove testing-only JWT creation fallback
 
 
   const handleSendOtp = async () => {
@@ -146,18 +117,15 @@ export default function LoginScreen() {
           router.replace("/order");
         }, 100);
       } else if (result.Message === "Success") {
-        // API returns success - check for JWT token in cookies
+        // API returns success - require JWT token from backend
         if (result.jwtToken) {
           console.log("Login successful - using JWT token from backend:", result.jwtToken);
           await authLogin(result.jwtToken);
         } else {
-          // Fallback: create JWT token based on user (for testing)
-          const jwtToken = createJWTForUser(formattedPhone);
-          console.log("Login successful - using fallback JWT token for user:", formattedPhone);
-          console.log("JWT Token:", jwtToken);
-          await authLogin(jwtToken);
+          Alert.alert("ผิดพลาด", "ไม่พบ token จากระบบ โปรดลองใหม่หรือติดต่อผู้ดูแล");
+          return;
         }
-        
+
         // Also store cookies if they exist
         if (result.cookies) {
           await AsyncStorage.setItem('auth_cookies', result.cookies);
