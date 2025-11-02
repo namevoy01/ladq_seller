@@ -1,17 +1,23 @@
+import { useAuth } from '@/contexts/AuthContext';
+import { GetTimeSlot, PostTimeSlot, PostTimeSlotPayload } from '@/service/store';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
-import React, { useLayoutEffect, useState } from 'react';
-import { Modal, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { ActivityIndicator, Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function ManageQueue() {
   const navigation = useNavigation();
+  const { getBranchId } = useAuth();
 
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [maxQueue, setMaxQueue] = useState<number>(1);
   const [roundsPerHour, setRoundsPerHour] = useState<number>(4);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-
-  const maxQueueOptions = Array.from({ length: 10 }, (_, i) => i + 1);
+  const [startTime, setStartTime] = useState<string>(''); // HH:mm
+  const [endTime, setEndTime] = useState<string>('');     // HH:mm
+  const [saving, setSaving] = useState<boolean>(false);
 
   const roundOptions = [
     { rounds: 1, label: '1 รอบต่อชั่วโมง (60 นาทีต่อรอบ)' },
@@ -19,6 +25,67 @@ export default function ManageQueue() {
     { rounds: 3, label: '3 รอบต่อชั่วโมง (20 นาทีต่อรอบ)' },
     { rounds: 4, label: '4 รอบต่อชั่วโมง (15 นาทีต่อรอบ)' },
   ];
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const branchId = getBranchId();
+        if (!branchId) {
+          throw new Error('ไม่พบสาขา (branch_id) จากโทเคน');
+        }
+        let result = await GetTimeSlot(branchId);
+        // Expecting { Config: [ { interval_minutes, capacity, is_active, ... } ] }
+        let cfg = Array.isArray(result?.Config) && result.Config.length > 0 ? result.Config[0] : null;
+        // If no existing config, create one using current UI defaults, then refetch
+        if (!cfg) {
+          const interval = Math.max(1, Math.floor(60 / Math.max(1, roundsPerHour)));
+          const payload: PostTimeSlotPayload = {
+            interval_minutes: interval,
+            capacity: Math.max(0, maxQueue | 0),
+            start_at: startTime ? `${startTime}:00` : '00:00:00',
+            end_at: endTime ? `${endTime}:00` : '00:00:00',
+          };
+          try {
+            await PostTimeSlot(payload);
+            result = await GetTimeSlot(branchId);
+            cfg = Array.isArray(result?.Config) && result.Config.length > 0 ? result.Config[0] : null;
+          } catch (createErr) {
+            // If creation fails, keep cfg as null and surface error below as needed
+            console.warn('สร้าง TimeSlot ครั้งแรกไม่สำเร็จ', createErr);
+          }
+        }
+        if (cfg) {
+          setIsQueueOpen(!!cfg.is_active);
+          // capacity -> จำนวนคิวสูงสุด
+          if (typeof cfg.capacity === 'number' && cfg.capacity > 0) {
+            setMaxQueue(cfg.capacity);
+          }
+          // interval_minutes -> รอบต่อชั่วโมง = 60 / interval_minutes
+          if (typeof cfg.interval_minutes === 'number' && cfg.interval_minutes > 0) {
+            const rounds = Math.max(1, Math.floor(60 / cfg.interval_minutes));
+            // Clamp to available options 1-4
+            const clamped = Math.min(4, Math.max(1, rounds));
+            setRoundsPerHour(clamped);
+          }
+          // Parse start_at / end_at -> HH:mm
+          const pickHHmm = (isoLike?: string): string => {
+            if (!isoLike || typeof isoLike !== 'string') return '';
+            const m = isoLike.match(/T(\d{2}:\d{2}):\d{2}/);
+            return m ? m[1] : '';
+          };
+          setStartTime(pickHHmm(cfg.start_at));
+          setEndTime(pickHHmm(cfg.end_at));
+        }
+      } catch (e: any) {
+        setError(e?.message || 'ไม่สามารถดึงการตั้งค่าคิวได้');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadConfig();
+  }, [getBranchId]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -28,12 +95,37 @@ export default function ManageQueue() {
     });
   }, [navigation]);
 
-  const handleSave = () => {
-    setModalVisible(true);
+  const handleSave = async () => {
+    try {
+      setError(null);
+      setSaving(true);
+      // Convert roundsPerHour to interval minutes (1->60, 2->30, 3->20, 4->15)
+      const interval = Math.max(1, Math.floor(60 / Math.max(1, roundsPerHour)));
+      const payload: PostTimeSlotPayload = {
+        interval_minutes: interval,
+        capacity: Math.max(0, maxQueue | 0),
+        start_at: startTime ? `${startTime}:00` : '00:00:00',
+        end_at: endTime ? `${endTime}:00` : '00:00:00',
+      };
+      await PostTimeSlot(payload);
+      setModalVisible(true);
+    } catch (e: any) {
+      setError(e?.message || 'บันทึกการตั้งค่าคิวไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <View style={styles.container}>
+      {loading && (
+        <View style={{ paddingVertical: 8 }}>
+          <ActivityIndicator />
+        </View>
+      )}
+      {!!error && (
+        <Text style={{ color: '#b91c1c', marginBottom: 8 }}>{error}</Text>
+      )}
       <View style={styles.card}>
         <View style={styles.headerRow}>
           <Text style={styles.cardTitle}>จัดการคิว</Text>
@@ -48,15 +140,17 @@ export default function ManageQueue() {
 
         <Text style={styles.sectionLabel}>จำนวนคิวสูงสุด</Text>
         <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={maxQueue}
-            onValueChange={(value: number) => setMaxQueue(value)}
-            style={styles.picker}
-          >
-            {maxQueueOptions.map((num) => (
-              <Picker.Item key={num} label={num.toString()} value={num} />
-            ))}
-          </Picker>
+          <TextInput
+            value={String(maxQueue)}
+            onChangeText={(text) => {
+              const onlyDigits = text.replace(/[^0-9]/g, '');
+              const num = onlyDigits === '' ? 0 : parseInt(onlyDigits, 10);
+              setMaxQueue(Number.isNaN(num) ? 0 : num);
+            }}
+            keyboardType="number-pad"
+            style={{ height: 50, paddingHorizontal: 12 }}
+            placeholder="ระบุจำนวนคิวสูงสุด"
+          />
         </View>
 
         <Text style={[styles.sectionLabel, { marginTop: 16 }]}>ช่วงเวลาต่อรอบ</Text>
@@ -72,8 +166,50 @@ export default function ManageQueue() {
           </Picker>
         </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85}>
-          <Text style={styles.saveText}>บันทึกการตั้งค่า</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 16 }]}>เวลาเปิด-ปิด</Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={[styles.pickerContainer, { flex: 1 }]}> 
+            <TextInput
+              value={startTime}
+              onChangeText={(text) => {
+                // Allow only digits and colon, format to HH:MM
+                const sanitized = text.replace(/[^0-9:]/g, '');
+                // Auto-insert colon if typing digits
+                const digits = sanitized.replace(/:/g, '');
+                let hh = digits.slice(0, 2);
+                let mm = digits.slice(2, 4);
+                let formatted = hh;
+                if (mm.length > 0) formatted += ':' + mm;
+                setStartTime(formatted);
+              }}
+              keyboardType="number-pad"
+              placeholder="เปิด (HH:MM)"
+              style={{ height: 50, paddingHorizontal: 12 }}
+              maxLength={5}
+            />
+          </View>
+          <View style={[styles.pickerContainer, { flex: 1 }]}> 
+            <TextInput
+              value={endTime}
+              onChangeText={(text) => {
+                const sanitized = text.replace(/[^0-9:]/g, '');
+                const digits = sanitized.replace(/:/g, '');
+                let hh = digits.slice(0, 2);
+                let mm = digits.slice(2, 4);
+                let formatted = hh;
+                if (mm.length > 0) formatted += ':' + mm;
+                setEndTime(formatted);
+              }}
+              keyboardType="number-pad"
+              placeholder="ปิด (HH:MM)"
+              style={{ height: 50, paddingHorizontal: 12 }}
+              maxLength={5}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85} disabled={saving}>
+          <Text style={styles.saveText}>{saving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -89,7 +225,9 @@ export default function ManageQueue() {
             <Text style={styles.modalText}>
               สถานะคิว: {isQueueOpen ? 'เปิด' : 'ปิด'}{'\n'}
               จำนวนคิวสูงสุด: {maxQueue}{'\n'}
-              รอบต่อชั่วโมง: {roundsPerHour}
+              รอบต่อชั่วโมง: {roundsPerHour}{'\n'}
+              เวลาเปิด: {startTime || '-'}{'\n'}
+              เวลาปิด: {endTime || '-'}
             </Text>
             <TouchableOpacity
               style={styles.modalButton}

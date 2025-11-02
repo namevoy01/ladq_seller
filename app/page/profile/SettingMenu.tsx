@@ -1,5 +1,12 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { CreateMenu, MenuAll, MenuCategories, MenuCategory } from "@/service/store";
+import {
+  CreateMenu,
+  MenuAll,
+  MenuCategories,
+  MenuCategory,
+  UpdateMenu,
+  UpdateMenuPayload,
+} from "@/service/store";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
@@ -19,8 +26,25 @@ const DEFAULT_IMAGE_URL =
   "https://upload.wikimedia.org/wikipedia/commons/1/15/No_image_available_600_x_450.svg.png";
 
 interface MenuOption {
-  name: string;
-  price: number;
+  ID: string;
+  Name: string;
+  Type: string;
+  IsRequired: boolean;
+  Min: number;
+  Max: number;
+  Display: number;
+  IsActive: boolean;
+  Price: number;
+  SubOption?: SubOption[];
+}
+
+interface SubOption {
+  ID: string;
+  Name: string;
+  Price: number;
+  IsDefault: boolean;
+  Display: number;
+  IsActive: boolean;
 }
 
 interface MenuItem {
@@ -34,7 +58,7 @@ interface MenuItem {
 }
 
 export default function SettingMenu() {
-  const { getMerchantId, getUserId, getBranchId, getRole, getUserInfo } = useAuth();
+  const { getMerchantId } = useAuth();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,7 +77,8 @@ export default function SettingMenu() {
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
   const onlyDigits = (text: string) => text.replace(/[^0-9]/g, "");
-  const isBlank = (text: string | null | undefined) => !text || text.trim().length === 0;
+  const isBlank = (text: string | null | undefined) =>
+    !text || text.trim().length === 0;
 
   // ---- โหลดเมนูจาก API ----
   useEffect(() => {
@@ -65,30 +90,33 @@ export default function SettingMenu() {
           return;
         }
         const [data, categories] = await Promise.all([
-          MenuAll(merchantId),
+          MenuAll(merchantId).catch(() => []),
           MenuCategories().catch(() => [] as MenuCategory[]),
         ]);
 
         // Build id -> name map
         const map: Record<number, string> = {};
-        categories.forEach((c) => {
-          if (c && typeof c.id === 'number' && typeof c.name === 'string') {
-            map[c.id] = c.name;
-          }
-        });
+        if (categories && Array.isArray(categories)) {
+          categories.forEach((c) => {
+            if (c && typeof c.id === "number" && typeof c.name === "string") {
+              map[c.id] = c.name;
+            }
+          });
+        }
         setCategoryMap(map);
         setCategories(categories);
-        const formatted = data.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
+
+        const formatted = (data && Array.isArray(data) ? data : []).map((item: any) => ({
+          id: item.ID,
+          name: item.Name,
+          price: item.Price,
           image:
-            item.image && item.image.startsWith("http")
-              ? item.image
+            item.Image && item.Image.startsWith("http")
+              ? item.Image
               : DEFAULT_IMAGE_URL,
-          detail: item.detail,
-          category_id: item.category_id,
-          options: item.options || [],
+          detail: item.Detail,
+          category_id: item.Category,
+          options: item.Option || [],
         }));
         setMenuItems(formatted);
       } catch (error) {
@@ -104,7 +132,8 @@ export default function SettingMenu() {
   const pickImageFromDevice = async () => {
     try {
       if (Platform.OS === "ios") {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
           alert("กรุณาอนุญาตการเข้าถึงรูปภาพเพื่อเลือกไฟล์จากเครื่อง");
           return;
@@ -135,7 +164,12 @@ export default function SettingMenu() {
 
   const saveNewMenu = async () => {
     try {
-      if (isBlank(menuName) || isBlank(menuCategoryId) || isBlank(menuPrice) || isBlank(menuDetail)) {
+      if (
+        isBlank(menuName) ||
+        isBlank(menuCategoryId) ||
+        isBlank(menuPrice) ||
+        isBlank(menuDetail)
+      ) {
         alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
         return;
       }
@@ -146,26 +180,7 @@ export default function SettingMenu() {
         image: menuImage || DEFAULT_IMAGE_URL,
         name: menuName,
         price: Number(menuPrice),
-        options: menuOptions.length
-          ? [
-              {
-                display: 0,
-                is_active: true,
-                is_required: false,
-                max: 1,
-                min: 0,
-                name: "ตัวเลือก",
-                type: "single",
-                subs: menuOptions.map((opt, idx) => ({
-                  display: idx,
-                  is_active: true,
-                  is_default: false,
-                  name: opt.name,
-                  price: Number(opt.price) || 0,
-                })),
-              },
-            ]
-          : [],
+        options: [],
       };
 
       const created = await CreateMenu(payload);
@@ -199,23 +214,99 @@ export default function SettingMenu() {
     setEditModalVisible(true);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingItem) return;
-    const updatedItems = menuItems.map((item) =>
-      item.id === editingItem.id
-        ? {
-            ...item,
-            name: menuName,
-            price: Number(menuPrice),
-            image: menuImage,
-            detail: menuDetail,
-            category_id: Number(menuCategoryId),
-            options: menuOptions,
+    try {
+      if (
+        isBlank(menuName) ||
+        isBlank(menuCategoryId) ||
+        isBlank(menuPrice) ||
+        isBlank(menuDetail)
+      ) {
+        alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+        return;
+      }
+
+      // ✅ แปลง menuOptions เป็นโครงสร้างของ UpdateMenuPayload
+      const apiOptions = menuOptions.map((opt) => ({
+        id: opt.ID || "",
+        name: opt.Name,
+        type: opt.Type,
+        is_required: opt.IsRequired,
+        min: opt.Min,
+        max: opt.Max,
+        display: true,
+        is_active: opt.IsActive,
+        sub_options: (opt.SubOption || []).map((sub) => ({
+          id: sub.ID || "",
+          name: sub.Name,
+          price: sub.Price,
+          is_default: sub.IsDefault,
+          display: true,
+          is_active: sub.IsActive,
+        })),
+      }));
+
+      const updatePayload: UpdateMenuPayload = {
+        id: editingItem.id,
+        category_id: Number(menuCategoryId) || 1,
+        name: menuName,
+        detail: menuDetail,
+        image: menuImage || DEFAULT_IMAGE_URL,
+        price: Number(menuPrice),
+        options: apiOptions,
+      };
+
+      console.log("📤 ส่งข้อมูลแก้ไขเมนู:", JSON.stringify(updatePayload, null, 2));
+
+      await UpdateMenu(updatePayload);
+
+      // ✅ รีโหลดเมนูหลังอัปเดตสำเร็จ
+      try {
+        const merchantId = getMerchantId();
+        if (merchantId) {
+          const [data, categories] = await Promise.all([
+            MenuAll(merchantId).catch(() => []),
+            MenuCategories().catch(() => [] as MenuCategory[]),
+          ]);
+
+          const map: Record<number, string> = {};
+          if (categories && Array.isArray(categories)) {
+            categories.forEach((c) => {
+              if (c && typeof c.id === "number" && typeof c.name === "string") {
+                map[c.id] = c.name;
+              }
+            });
           }
-        : item
-    );
-    setMenuItems(updatedItems);
-    setEditModalVisible(false);
+
+          setCategoryMap(map);
+          setCategories(categories);
+
+          const formatted = (data && Array.isArray(data) ? data : []).map((item: any) => ({
+            id: item.ID,
+            name: item.Name,
+            price: item.Price,
+            image:
+              item.Image && item.Image.startsWith("http")
+                ? item.Image
+                : DEFAULT_IMAGE_URL,
+            detail: item.Detail,
+            category_id: item.Category,
+            options: item.Option || [],
+          }));
+
+          setMenuItems(formatted);
+        }
+      } catch (refreshError) {
+        console.error("ไม่สามารถโหลดข้อมูลเมนูใหม่:", refreshError);
+      }
+
+      setEditModalVisible(false);
+      alert("✅ แก้ไขเมนูสำเร็จ");
+    } catch (error) {
+      console.error("❌ แก้ไขเมนูไม่สำเร็จ:", error);
+      alert("แก้ไขเมนูไม่สำเร็จ กรุณาลองอีกครั้ง");
+    }
   };
 
   const deleteMenu = () => {
@@ -225,12 +316,35 @@ export default function SettingMenu() {
     setEditModalVisible(false);
   };
 
-  const addOption = () => setMenuOptions([...menuOptions, { name: "", price: 0 }]);
+  // ---- Option/SubOption actions ----
+  const addOption = () =>
+    setMenuOptions([
+      ...menuOptions,
+      {
+        ID: "",
+        Name: "",
+        Type: "single",
+        IsRequired: false,
+        Min: 0,
+        Max: 1,
+        Display: 0,
+        IsActive: true,
+        Price: 0,
+        SubOption: [],
+      },
+    ]);
 
-  const updateOption = (index: number, key: keyof MenuOption, value: string) => {
+  const updateOption = (
+    index: number,
+    key: keyof MenuOption,
+    value: string
+  ) => {
     const newOptions = [...menuOptions];
-    if (key === "price") newOptions[index].price = Number(value);
-    else newOptions[index].name = value;
+    if (key === "Price") newOptions[index].Price = Number(value);
+    else if (key === "Name") newOptions[index].Name = value;
+    else if (key === "Type") newOptions[index].Type = value;
+    else if (key === "Min") newOptions[index].Min = Number(value);
+    else if (key === "Max") newOptions[index].Max = Number(value);
     setMenuOptions(newOptions);
   };
 
@@ -240,11 +354,57 @@ export default function SettingMenu() {
     setMenuOptions(newOptions);
   };
 
-  // ✅ แสดงเมนูและ options
+  const addSubOption = (optionIndex: number) => {
+    const newOptions = [...menuOptions];
+    if (!newOptions[optionIndex].SubOption) {
+      newOptions[optionIndex].SubOption = [];
+    }
+    newOptions[optionIndex].SubOption.push({
+      ID: "",
+      Name: "",
+      Price: 0,
+      IsDefault: false,
+      Display: 0,
+      IsActive: true,
+    });
+    setMenuOptions(newOptions);
+  };
+
+  const updateSubOption = (
+    optionIndex: number,
+    subIndex: number,
+    key: keyof SubOption,
+    value: string
+  ) => {
+    const newOptions = [...menuOptions];
+    if (newOptions[optionIndex].SubOption) {
+      if (key === "Price") {
+        newOptions[optionIndex].SubOption![subIndex].Price = Number(value);
+      } else if (key === "Name") {
+        newOptions[optionIndex].SubOption![subIndex].Name = value;
+      }
+    }
+    setMenuOptions(newOptions);
+  };
+
+  const removeSubOption = (optionIndex: number, subIndex: number) => {
+    const newOptions = [...menuOptions];
+    if (newOptions[optionIndex].SubOption) {
+      newOptions[optionIndex].SubOption!.splice(subIndex, 1);
+    }
+    setMenuOptions(newOptions);
+  };
+
+  // ✅ UI render
   const renderMenuItem = ({ item }: { item: MenuItem }) => (
     <View style={styles.card}>
       <Image
-        source={{ uri: item.image && item.image.startsWith("http") ? item.image : DEFAULT_IMAGE_URL }}
+        source={{
+          uri:
+            item.image && item.image.startsWith("http")
+              ? item.image
+              : DEFAULT_IMAGE_URL,
+        }}
         style={styles.menuImage}
       />
       <View style={styles.itemInfo}>
@@ -252,38 +412,67 @@ export default function SettingMenu() {
         <Text style={styles.menuPrice}>{item.price} บาท</Text>
         {item.detail ? <Text style={styles.menuDetail}>{item.detail}</Text> : null}
         <Text style={styles.menuCategory}>
-          หมวดหมู่: {typeof item.category_id === "number" ? (categoryMap[item.category_id] || item.category_id) : "-"}
+          หมวดหมู่: {item.category_id || "-"}
         </Text>
 
-        {item.options && item.options.length > 0 && (
+        {item.options && Array.isArray(item.options) && item.options.length > 0 && (
           <View style={styles.optionList}>
             {item.options.map((opt, idx) => (
-              <Text key={idx} style={styles.optionItem}>
-                • {opt.name} +{opt.price}฿
-              </Text>
+              <View key={`${item.id}-option-${idx}-${opt.Name}`}>
+                <Text style={styles.optionItem}>• {opt.Name} ({opt.Type})</Text>
+                {opt.SubOption && Array.isArray(opt.SubOption) && opt.SubOption.length > 0 && (
+                  <View style={{ marginLeft: 10 }}>
+                    {opt.SubOption.map((subOpt, subIdx) => (
+                      <Text
+                        key={`${item.id}-suboption-${idx}-${subIdx}-${subOpt.Name}`}
+                        style={[
+                          styles.optionItem,
+                          { fontSize: 12, color: "#6b7280" },
+                        ]}
+                      >
+                        - {subOpt.Name} +{subOpt.Price}฿
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
             ))}
           </View>
         )}
       </View>
-      <TouchableOpacity style={styles.editButton} onPress={() => handleEditItem(item)} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={styles.editButton}
+        onPress={() => handleEditItem(item)}
+        activeOpacity={0.8}
+      >
         <Text style={styles.editText}>แก้ไข</Text>
       </TouchableOpacity>
     </View>
   );
 
-  const renderMenuForm = (onSave: () => void, onClose: () => void, title: string, showDelete?: boolean) => (
+  const renderMenuForm = (
+    onSave: () => void,
+    onClose: () => void,
+    title: string,
+    showDelete?: boolean
+  ) => (
     <View style={styles.modalOuter}>
       <ScrollView contentContainerStyle={styles.modalContainer}>
         <Text style={styles.modalTitle}>{title}</Text>
-
-        <TextInput style={styles.input} placeholder="ชื่อเมนู" value={menuName} onChangeText={setMenuName} />
+        <TextInput
+          style={styles.input}
+          placeholder="ชื่อเมนู"
+          value={menuName}
+          onChangeText={setMenuName}
+        />
         <TouchableOpacity
           style={[styles.categorySelect]}
           onPress={() => setCategoryModalVisible(true)}
           activeOpacity={0.8}
         >
           <Text>
-            {categoryMap[Number(menuCategoryId)] || `เลือกหมวดหมู่ (ID: ${menuCategoryId || '-'})`}
+            {categoryMap[Number(menuCategoryId)] ||
+              `เลือกหมวดหมู่ (ID: ${menuCategoryId || "-"})`}
           </Text>
         </TouchableOpacity>
         <TextInput
@@ -300,56 +489,171 @@ export default function SettingMenu() {
           value={menuDetail}
           onChangeText={setMenuDetail}
         />
-
         {menuImage ? (
           <Image source={{ uri: menuImage }} style={styles.previewImage} />
         ) : (
           <Image source={{ uri: DEFAULT_IMAGE_URL }} style={styles.previewImage} />
         )}
-
-        <TouchableOpacity style={styles.pickImageButton} onPress={pickImageFromDevice} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.pickImageButton}
+          onPress={pickImageFromDevice}
+          activeOpacity={0.8}
+        >
           <Text style={styles.pickImageButtonText}>
             {menuImage ? "เปลี่ยนรูปภาพ" : "เลือกรูปภาพจากเครื่อง"}
           </Text>
         </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>ตัวเลือกเพิ่มเติม</Text>
-        {menuOptions.map((opt, index) => (
-          <View key={index} style={styles.optionRow}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="ชื่อ"
-              value={opt.name}
-              onChangeText={(text) => updateOption(index, "name", text)}
-            />
-            <TextInput
-              style={[styles.input, { width: 100 }]}
-              placeholder="ราคา"
-              keyboardType="number-pad"
-              value={opt.price.toString()}
-              onChangeText={(text) => updateOption(index, "price", onlyDigits(text))}
-            />
-            <TouchableOpacity onPress={() => removeOption(index)}>
-              <Text style={styles.removeOption}>ลบ</Text>
+        {menuOptions && Array.isArray(menuOptions) && menuOptions.map((opt, index) => (
+          <View key={`menu-option-${index}-${opt.Name}`} style={styles.optionGroup}>
+            <View style={styles.optionRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="ชื่อตัวเลือก (เช่น ขนาด, เพิ่มเติม)"
+                value={opt.Name}
+                onChangeText={(text) => updateOption(index, "Name", text)}
+              />
+              <TouchableOpacity onPress={() => removeOption(index)}>
+                <Text style={styles.removeOption}>ลบ</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.optionTypeRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="ประเภท (single/multiple)"
+                value={opt.Type}
+                onChangeText={(text) => updateOption(index, "Type", text)}
+              />
+              <TextInput
+                style={[styles.input, { width: 60 }]}
+                placeholder="Min"
+                keyboardType="number-pad"
+                value={opt.Min.toString()}
+                onChangeText={(text) =>
+                  updateOption(index, "Min", onlyDigits(text))
+                }
+              />
+              <TextInput
+                style={[styles.input, { width: 60 }]}
+                placeholder="Max"
+                keyboardType="number-pad"
+                value={opt.Max.toString()}
+                onChangeText={(text) =>
+                  updateOption(index, "Max", onlyDigits(text))
+                }
+              />
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                const updated = [...menuOptions];
+                updated[index].IsActive = !updated[index].IsActive;
+                setMenuOptions(updated);
+              }}
+              style={[
+                styles.toggleButton,
+                { backgroundColor: opt.IsActive ? "#22c55e" : "#9ca3af" },
+              ]}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>
+                {opt.IsActive ? "เปิดใช้งาน" : "ปิดการใช้งาน"}
+              </Text>
+            </TouchableOpacity>
+
+            <Text
+              style={[styles.sectionTitle, { fontSize: 14, marginTop: 10 }]}
+            >
+              ตัวเลือกรายย่อย:
+            </Text>
+            {opt.SubOption && Array.isArray(opt.SubOption) && opt.SubOption.map((subOpt, subIndex) => (
+              <View
+                key={`sub-option-${index}-${subIndex}-${subOpt.Name}`}
+                style={styles.subOptionRow}
+              >
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="ชื่อตัวเลือกรายย่อย"
+                  value={subOpt.Name}
+                  onChangeText={(text) =>
+                    updateSubOption(index, subIndex, "Name", text)
+                  }
+                />
+                <TextInput
+                  style={[styles.input, { width: 100 }]}
+                  placeholder="ราคา"
+                  keyboardType="number-pad"
+                  value={subOpt.Price.toString()}
+                  onChangeText={(text) =>
+                    updateSubOption(index, subIndex, "Price", onlyDigits(text))
+                  }
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    const newOptions = [...menuOptions];
+                    newOptions[index].SubOption![subIndex].IsActive =
+                      !newOptions[index].SubOption![subIndex].IsActive;
+                    setMenuOptions(newOptions);
+                  }}
+                  style={[
+                    styles.toggleSubButton,
+                    {
+                      backgroundColor: subOpt.IsActive
+                        ? "#22c55e"
+                        : "#9ca3af",
+                    },
+                  ]}
+                >
+                  <Text style={{ color: "#fff", fontSize: 12 }}>
+                    {subOpt.IsActive ? "เปิด" : "ปิด"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => removeSubOption(index, subIndex)}>
+                  <Text style={styles.removeOption}>ลบ</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            <TouchableOpacity
+              style={styles.addSubOptionButton}
+              onPress={() => addSubOption(index)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.addSubOptionText}>+ เพิ่มตัวเลือกรายย่อย</Text>
             </TouchableOpacity>
           </View>
         ))}
 
-        <TouchableOpacity style={styles.addOptionButton} onPress={addOption} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.addOptionButton}
+          onPress={addOption}
+          activeOpacity={0.8}
+        >
           <Text style={styles.addOptionText}>+ เพิ่มตัวเลือก</Text>
         </TouchableOpacity>
 
         <View style={styles.modalButtons}>
-          <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={onSave}>
+          <TouchableOpacity
+            style={[styles.modalButton, styles.saveButton]}
+            onPress={onSave}
+          >
             <Text style={styles.modalButtonText}>บันทึก</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={onClose}>
+          <TouchableOpacity
+            style={[styles.modalButton, styles.cancelButton]}
+            onPress={onClose}
+          >
             <Text style={styles.modalButtonText}>ยกเลิก</Text>
           </TouchableOpacity>
         </View>
 
         {showDelete && (
-          <TouchableOpacity style={[styles.modalButton, styles.deleteButton]} onPress={deleteMenu}>
+          <TouchableOpacity
+            style={[styles.modalButton, styles.deleteButton]}
+            onPress={deleteMenu}
+          >
             <Text style={styles.modalButtonText}>ลบเมนู</Text>
           </TouchableOpacity>
         )}
@@ -369,12 +673,16 @@ export default function SettingMenu() {
       <View style={styles.mainCard}>
         <Text style={styles.title}>📋 เมนูทั้งหมด</Text>
 
-        <TouchableOpacity style={styles.addButton} onPress={handleAddMenu} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={handleAddMenu}
+          activeOpacity={0.8}
+        >
           <Text style={styles.addButtonText}>+ เพิ่มเมนู</Text>
         </TouchableOpacity>
 
         <FlatList
-          data={menuItems}
+          data={menuItems || []}
           keyExtractor={(item) => item.id}
           renderItem={renderMenuItem}
           scrollEnabled={false}
@@ -397,9 +705,9 @@ export default function SettingMenu() {
             <View style={styles.categoryModalCard}>
               <Text style={styles.categoryModalTitle}>เลือกหมวดหมู่</Text>
               <ScrollView style={{ maxHeight: 320 }}>
-                {categories.map((cat) => (
+                {categories && Array.isArray(categories) && categories.map((cat) => (
                   <TouchableOpacity
-                    key={cat.id}
+                    key={`category-${cat.id}-${cat.name}`}
                     style={styles.categoryItem}
                     onPress={() => {
                       setMenuCategoryId(String(cat.id));
@@ -407,7 +715,9 @@ export default function SettingMenu() {
                     }}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.categoryItemText}>{cat.name} (ID: {cat.id})</Text>
+                    <Text style={styles.categoryItemText}>
+                      {cat.name} (ID: {cat.id})
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -419,6 +729,7 @@ export default function SettingMenu() {
   );
 }
 
+// ✅ styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9fafb" },
   mainCard: {
@@ -478,7 +789,7 @@ const styles = StyleSheet.create({
   },
   editText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
-  // ✅ Modal styles
+  // ✅ Modal
   modalOuter: {
     flex: 1,
     backgroundColor: "#fff",
@@ -534,8 +845,43 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "#1f2937",
   },
+  optionGroup: {
+    backgroundColor: "#f8f9fa",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
   optionRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  optionTypeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    gap: 8,
+  },
+  subOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    marginLeft: 10,
+    backgroundColor: "#fff",
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+  },
   removeOption: { color: "#ef4444", marginLeft: 8, fontWeight: "700" },
+  addSubOptionButton: {
+    backgroundColor: "#3b82f6",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: "center",
+    marginTop: 8,
+    marginLeft: 10,
+  },
+  addSubOptionText: { color: "#fff", fontWeight: "600", fontSize: 12 },
   addOptionButton: {
     backgroundColor: "#2563eb",
     paddingVertical: 12,
@@ -545,11 +891,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addOptionText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-   modalButtons: {
-     flexDirection: "row",
-     justifyContent: "space-between",
-     marginTop: 20,
-   },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
   modalButton: {
     flex: 1,
     paddingVertical: 14,
@@ -600,5 +946,18 @@ const styles = StyleSheet.create({
   categoryItemText: {
     fontSize: 15,
     color: "#111827",
+  },
+  toggleButton: {
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: "center",
+    marginVertical: 6,
+  },
+  toggleSubButton: {
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginHorizontal: 6,
+    alignItems: "center",
   },
 });

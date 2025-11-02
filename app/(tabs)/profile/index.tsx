@@ -4,11 +4,12 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, type Href } from "expo-router";
 import React, { useRef, useState } from "react";
 import { Alert, Image, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import CreateStore from "../../page/createstore/index";
 
 export default function ProfileScreen() {
   const [isOpen, setIsOpen] = useState(true);
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, getMerchantId } = useAuth();
   const isNavigatingRef = useRef(false);
 
   const guardedPush = (path: Href) => {
@@ -40,6 +41,13 @@ export default function ProfileScreen() {
       ]
     );
   };
+
+  const merchantId = getMerchantId?.();
+
+  if (!merchantId || merchantId === "") {
+    // Inline render create store UI when merchant is missing
+    return <CreateStore />;
+  }
 
   return (
     <Layout>

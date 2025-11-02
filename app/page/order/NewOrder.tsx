@@ -1,6 +1,8 @@
 import { useText } from "@/app/_layout";
-import { useState } from "react";
+import { getNewOrdersPagination } from "@/service/order";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   ListRenderItemInfo,
   Modal,
@@ -10,53 +12,66 @@ import {
   View,
 } from "react-native";
 
-interface Product {
-  name: string;
-  qty: number;
-  price: number;
+interface Menu {
+  menu_name: string;
+  menu_price: number;
+}
+
+interface OrderItem {
+  order_item_id: string;
+  menu: Menu;
+  quantity: number;
+  order_item_option: any[];
 }
 
 interface Order {
-  id: string;
-  items: Product[];
+  order_id: string;
+  fast_lane_price: string;
+  order_status: string;
+  pickup_at: string;
+  created_at: string;
+  updated_at: string | null;
+  order_item: OrderItem[];
   waitEdit?: boolean; // ถ้า true จะข้ามแก้ไข
 }
 
-const initialData: Order[] = [
-  {
-    id: "001",
-    items: [
-      { name: "สินค้า A", qty: 2, price: 100 },
-      { name: "สินค้า B", qty: 1, price: 50 },
-    ],
-    waitEdit: true,
-  },
-  {
-    id: "002",
-    items: [
-      { name: "สินค้า C", qty: 5, price: 20 },
-      { name: "สินค้า D", qty: 3, price: 200 },
-      { name: "สินค้า E", qty: 1, price: 150 },
-    ],
-    waitEdit: true,
-  },
-  {
-    id: "003",
-    items: [
-      { name: "สินค้า C", qty: 5, price: 20 },
-      { name: "สินค้า D", qty: 3, price: 200 },
-      { name: "สินค้า E", qty: 1, price: 150 },
-    ],
-  },
-];
+interface ApiResponse {
+  Orders: Order[];
+  TotalPage: number;
+}
 
 export default function NewOrder() {
   const Text = useText();
-  const [orders, setOrders] = useState<Order[]>(initialData);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalPages, setTotalPages] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
 
-  const firstEditableIndex = orders.findIndex((o) => !o.waitEdit);
+  // Fetch orders from API
+  const fetchOrders = async (offset: number = 0, limit: number = 10) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response: ApiResponse = await getNewOrdersPagination(offset, limit);
+      setOrders(response.Orders);
+      setTotalPages(response.TotalPage);
+      setCurrentPage(offset);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
+      console.error('Error fetching orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const firstEditableIndex = orders?.findIndex((o) => !o.waitEdit) ?? -1;
 
   const handleEdit = (order: Order) => {
     setSelectedOrder(order);
@@ -65,89 +80,156 @@ export default function NewOrder() {
 
   const handleDeleteItem = (index: number) => {
     if (!selectedOrder) return;
-    const updatedItems = selectedOrder.items.filter((_, i) => i !== index);
-    setSelectedOrder({ ...selectedOrder, items: updatedItems });
+    const updatedItems = selectedOrder.order_item.filter((_, i) => i !== index);
+    setSelectedOrder({ ...selectedOrder, order_item: updatedItems });
   };
 
   const handleSend = () => {
     if (!selectedOrder) return;
     setOrders((prev) =>
-      prev.map((o) => (o.id === selectedOrder.id ? selectedOrder : o))
+      prev.map((o) => (o.order_id === selectedOrder.order_id ? selectedOrder : o))
     );
     setModalVisible(false);
   };
 
   const handleCancel = () => setModalVisible(false);
 
-  const renderOrder = ({ item, index }: ListRenderItemInfo<Order>) => (
-    <View style={styles.orderContainer}>
-      {/* Header */}
-      <View style={styles.orderHeader}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <RNText style={styles.orderTitle}>บิลเลขที่: {item.id}</RNText>
-          {item.waitEdit && (
-            <View style={styles.badge}>
-              <RNText style={styles.badgeText}>รอแก้ไข</RNText>
-            </View>
-          )}
+  const renderOrder = ({ item, index }: ListRenderItemInfo<Order>) => {
+    const formatTime = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toLocaleTimeString('th-TH', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+    };
+
+    const formatDate = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+    };
+
+    return (
+      <View style={styles.orderContainer}>
+        {/* Header */}
+        <View style={styles.orderHeader}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <RNText style={styles.orderTitle}>บิลเลขที่: {item.order_id.slice(0, 8)}</RNText>
+            {item.waitEdit && (
+              <View style={styles.badge}>
+                <RNText style={styles.badgeText}>รอแก้ไข</RNText>
+              </View>
+            )}
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <RNText style={styles.orderTime}>{formatTime(item.created_at)}</RNText>
+            <RNText style={styles.orderDate}>{formatDate(item.created_at)}</RNText>
+          </View>
         </View>
-        <RNText style={styles.orderTime}>16:00</RNText>
-      </View>
 
-      {/* Table Header */}
-      <View style={[styles.row, styles.header]}>
-        <RNText style={styles.cell}>รายการ</RNText>
-        <RNText style={styles.cell}>จำนวน</RNText>
-        <RNText style={styles.cell}>ราคา</RNText>
-      </View>
+        {/* Fast Lane Price */}
+        {item.fast_lane_price && item.fast_lane_price !== "0" && (
+          <View style={styles.fastLaneContainer}>
+            <RNText style={styles.fastLaneText}>
+              Fast Lane: +{item.fast_lane_price} บาท
+            </RNText>
+          </View>
+        )}
 
-      {/* Items */}
-      {item.items.map((it, i) => (
-        <View style={styles.row} key={i}>
-          <RNText style={styles.cell}>{it.name}</RNText>
-          <RNText style={styles.cell}>{it.qty}</RNText>
-          <RNText style={styles.cell}>{it.price}</RNText>
+        {/* Table Header */}
+        <View style={[styles.row, styles.header]}>
+          <RNText style={styles.cell}>รายการ</RNText>
+          <RNText style={styles.cell}>จำนวน</RNText>
+          <RNText style={styles.cell}>ราคา</RNText>
         </View>
-      ))}
 
-      {/* Summary */}
-      <View style={[styles.row, styles.footer]}>
-        <RNText style={styles.cell}>รวม</RNText>
-        <RNText style={styles.cell}>
-          {item.items.reduce((sum, p) => sum + p.qty, 0)}
-        </RNText>
-        <RNText style={styles.cell}>
-          {item.items.reduce((sum, p) => sum + p.qty * p.price, 0)}
-        </RNText>
-      </View>
+        {/* Items */}
+        {item.order_item.map((orderItem, i) => (
+          <View style={styles.row} key={`${item.order_id}-item-${i}-${orderItem.order_item_id}`}>
+            <RNText style={styles.cell}>{orderItem.menu.menu_name}</RNText>
+            <RNText style={styles.cell}>{orderItem.quantity}</RNText>
+            <RNText style={styles.cell}>{orderItem.menu.menu_price}</RNText>
+          </View>
+        ))}
 
-      {/* Buttons สำหรับบิลแก้ไขได้ */}
-      {index === firstEditableIndex && (
-        <View style={styles.buttonRow}>
-          <TouchableOpacity style={[styles.button, styles.acceptButton]}>
-            <RNText style={styles.buttonText}>รับ</RNText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.editButton]}
-            onPress={() => handleEdit(item)}
-          >
-            <RNText style={styles.buttonText}>แก้ไข</RNText>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.cancelButton]}>
-            <RNText style={styles.buttonText}>ยกเลิก</RNText>
-          </TouchableOpacity>
+        {/* Summary */}
+        <View style={[styles.row, styles.footer]}>
+          <RNText style={styles.cell}>รวม</RNText>
+          <RNText style={styles.cell}>
+            {item.order_item.reduce((sum, p) => sum + p.quantity, 0)}
+          </RNText>
+          <RNText style={styles.cell}>
+            {item.order_item.reduce((sum, p) => sum + (p.quantity * p.menu.menu_price), 0)}
+          </RNText>
         </View>
-      )}
-    </View>
-  );
+
+        {/* Pickup Time */}
+        <View style={styles.pickupContainer}>
+          <RNText style={styles.pickupText}>
+            รับสินค้า: {formatDate(item.pickup_at)} {formatTime(item.pickup_at)}
+          </RNText>
+        </View>
+
+        {/* Buttons สำหรับบิลแก้ไขได้ */}
+        {index === firstEditableIndex && (
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={[styles.button, styles.acceptButton]}>
+              <RNText style={styles.buttonText}>รับ</RNText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.editButton]}
+              onPress={() => handleEdit(item)}
+            >
+              <RNText style={styles.buttonText}>แก้ไข</RNText>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.button, styles.cancelButton]}>
+              <RNText style={styles.buttonText}>ยกเลิก</RNText>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1E7D37" />
+        <RNText style={styles.loadingText}>กำลังโหลดข้อมูล...</RNText>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <RNText style={styles.errorText}>{error}</RNText>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => fetchOrders()}
+        >
+          <RNText style={styles.retryButtonText}>ลองใหม่</RNText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
       <FlatList
         data={orders}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.order_id}
         renderItem={renderOrder}
         contentContainerStyle={{ padding: 10 }}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <RNText style={styles.emptyText}>ไม่มีคำสั่งซื้อใหม่</RNText>
+          </View>
+        }
       />
 
       {/* Modal แก้ไข */}
@@ -155,14 +237,14 @@ export default function NewOrder() {
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
             <RNText style={styles.modalTitle}>
-              แก้ไขบิล: {selectedOrder?.id}
+              แก้ไขบิล: {selectedOrder?.order_id.slice(0, 8)}
             </RNText>
 
-            {selectedOrder?.items.map((item, index) => (
-              <View style={styles.row} key={index}>
-                <RNText style={styles.cell}>{item.name}</RNText>
-                <RNText style={styles.cell}>{item.qty}</RNText>
-                <RNText style={styles.cell}>{item.price}</RNText>
+            {selectedOrder?.order_item.map((orderItem, index) => (
+              <View style={styles.row} key={`${selectedOrder.order_id}-modal-item-${index}-${orderItem.order_item_id}`}>
+                <RNText style={styles.cell}>{orderItem.menu.menu_name}</RNText>
+                <RNText style={styles.cell}>{orderItem.quantity}</RNText>
+                <RNText style={styles.cell}>{orderItem.menu.menu_price}</RNText>
                 <TouchableOpacity
                   style={styles.deleteButton}
                   onPress={() => handleDeleteItem(index)}
@@ -266,5 +348,78 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "bold",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#C42127",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: "#1E7D37",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#666",
+  },
+  orderDate: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 2,
+  },
+  fastLaneContainer: {
+    backgroundColor: "#FFE4B5",
+    padding: 8,
+    borderRadius: 4,
+    marginVertical: 8,
+  },
+  fastLaneText: {
+    color: "#DA8D10",
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  pickupContainer: {
+    backgroundColor: "#E8F5E8",
+    padding: 8,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  pickupText: {
+    color: "#1E7D37",
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
