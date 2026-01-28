@@ -1,3 +1,4 @@
+import GoogleMap from "@/components/GoogleMap";
 import Layout from "@/components/orther/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -66,6 +67,13 @@ export default function ProfileScreen() {
             <Switch value={isOpen} onValueChange={setIsOpen} />
           </View>
         </View>
+      </View>
+
+      {/* แผนที่ร้านค้า */}
+      <View style={styles.mapCard}>
+        <Text style={styles.mapTitle}>ตำแหน่งร้านบนแผนที่</Text>
+        {/* TODO: ปรับ latitude / longitude เป็นค่าจริงจากข้อมูลร้าน เมื่อมี API */}
+        <GoogleMap latitude={13.7563} longitude={100.5018} />
       </View>
 
       <View style={styles.card}>
@@ -158,6 +166,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
+  },
+  mapCard: {
+    marginTop: 16,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 12,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    gap: 8,
+  },
+  mapTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
   },
   cardHeader: {
     fontSize: 16,
