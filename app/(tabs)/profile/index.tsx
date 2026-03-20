@@ -74,6 +74,16 @@ export default function ProfileScreen() {
         <Text style={styles.mapTitle}>ตำแหน่งร้านบนแผนที่</Text>
         {/* TODO: ปรับ latitude / longitude เป็นค่าจริงจากข้อมูลร้าน เมื่อมี API */}
         <GoogleMap latitude={13.7563} longitude={100.5018} />
+        <View style={styles.mapActions}>
+          <TouchableOpacity
+            style={styles.mapButton}
+            activeOpacity={0.85}
+            onPress={() => guardedPush("/page/profile/InfoStore")}
+          >
+            <MaterialIcons name="edit-location-alt" size={18} color="#2563eb" />
+            <Text style={styles.mapButtonText}>ตั้งค่าแผนที่</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -97,6 +107,11 @@ export default function ProfileScreen() {
           icon={<MaterialIcons name="payment" size={22} color="#1f2937" />}
           label="ช่องทางการรับเงิน / แก้ไข"
           onPress={() => guardedPush("/page/profile/Payment")} />
+        
+        <MenuItem
+          icon={<MaterialIcons name="insights" size={22} color="#1f2937" />}
+          label="รายงานการขาย"
+          onPress={() => guardedPush("/page/profile/SalesReport")} />
         
         <MenuItem
           icon={<MaterialIcons name="logout" size={22} color="#dc2626" />}
@@ -161,6 +176,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 16,
     padding: 12,
+    marginTop: 20,
     elevation: 3,
     shadowColor: "#000",
     shadowOpacity: 0.06,
@@ -183,6 +199,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: "#111827",
+  },
+  mapActions: {
+    marginTop: 8,
+    alignItems: "flex-end",
+  },
+  mapButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    gap: 6,
+  },
+  mapButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#2563eb",
   },
   cardHeader: {
     fontSize: 16,

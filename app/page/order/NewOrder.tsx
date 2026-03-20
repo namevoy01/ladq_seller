@@ -60,8 +60,18 @@ export default function NewOrder() {
       setTotalPages(response.TotalPage);
       setCurrentPage(offset);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
-      console.error('Error fetching orders:', err);
+      const message =
+        err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการโหลดข้อมูล";
+
+      // ถ้าเป็น 500 ให้แสดงเป็น empty state เฉย ๆ ไม่ต้องขึ้น error เต็มจอ
+      if (message.includes("500")) {
+        setOrders([]);
+        setError(null);
+        console.warn("Error fetching new orders (500) - show empty list instead");
+      } else {
+        setError(message);
+        console.error("Error fetching orders:", err);
+      }
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,5 @@
 // services/otpService.ts
-const BASE_URL = "http://10.240.68.239:8080/api/v1";
+const BASE_URL = "https://independence-legislature-vehicle-feof.trycloudflare.com/api/v1";
 
 export const sendOtp = async (phone: string) => {
   try {
