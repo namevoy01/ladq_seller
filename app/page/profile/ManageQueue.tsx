@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { GetTimeSlot, PostTimeSlot, PostTimeSlotPayload } from '@/service/store';
+import { GetTimeSlot, PutPosTimeSlot, PutPosTimeSlotPayload } from '@/service/store';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
@@ -18,6 +18,7 @@ export default function ManageQueue() {
   const [startTime, setStartTime] = useState<string>(''); // HH:mm
   const [endTime, setEndTime] = useState<string>('');     // HH:mm
   const [saving, setSaving] = useState<boolean>(false);
+  const [configId, setConfigId] = useState<string>('');
 
   const roundOptions = [
     { rounds: 1, label: '1 รอบต่อชั่วโมง (60 นาทีต่อรอบ)' },
@@ -57,6 +58,7 @@ export default function ManageQueue() {
           }
         }
         if (cfg) {
+          if (typeof cfg.id === 'string') setConfigId(cfg.id);
           setIsQueueOpen(!!cfg.is_active);
           // capacity -> จำนวนคิวสูงสุด
           if (typeof cfg.capacity === 'number' && cfg.capacity > 0) {
@@ -101,13 +103,14 @@ export default function ManageQueue() {
       setSaving(true);
       // Convert roundsPerHour to interval minutes (1->60, 2->30, 3->20, 4->15)
       const interval = Math.max(1, Math.floor(60 / Math.max(1, roundsPerHour)));
-      const payload: PostTimeSlotPayload = {
+      const payload: PutPosTimeSlotPayload = {
+        id: configId, // from GET Branch/Config/TimeSlot/All/{branchId}
         interval_minutes: interval,
         capacity: Math.max(0, maxQueue | 0),
         start_at: startTime ? `${startTime}:00` : '00:00:00',
-        end_at: endTime ? `${endTime}:00` : '00:00:00',
+        end_at: endTime ? `${endTime}:00` : '23:59:59',
       };
-      await PostTimeSlot(payload);
+      await PutPosTimeSlot(payload);
       setModalVisible(true);
     } catch (e: any) {
       setError(e?.message || 'บันทึกการตั้งค่าคิวไม่สำเร็จ');

@@ -16,7 +16,8 @@ export default function GoogleMap({
 }: GoogleMapProps) {
   // ใช้ Google Static Maps API แสดงรูปแผนที่ (ง่ายและเสถียรบน Android)
   const GOOGLE_STATIC_MAPS_KEY = "AIzaSyC_1kxfXVTaF9Oliw22dqm-IjQjWf3vBek";
-  const url = `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=${zoom}&size=640x320&markers=color:red|${latitude},${longitude}&key=${GOOGLE_STATIC_MAPS_KEY}`;
+  // เอาหมุด (markers) ออก โดยไม่ใส่พารามิเตอร์ markers ลงใน Static Maps URL
+  const url = `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=${zoom}&size=640x320&key=${GOOGLE_STATIC_MAPS_KEY}`;
 
   return (
     <View style={[styles.container, { height }]}>

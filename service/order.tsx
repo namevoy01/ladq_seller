@@ -1,4 +1,4 @@
-const BASE_URL = "https://independence-legislature-vehicle-feof.trycloudflare.com/api/v1";
+const BASE_URL = "http://36392702-688e-41b5-a3e0-c23bd85e0b29.cloud.ce.kmitl.ac.th/api/v1";
 
 export const NewOrder = async (phone: string) => {
  

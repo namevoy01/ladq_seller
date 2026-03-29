@@ -3,12 +3,15 @@ import Layout from "@/components/orther/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, type Href } from "expo-router";
-import React, { useRef, useState } from "react";
-import { Alert, Image, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import CreateStore from "../../page/createstore/index";
+import { GetPosInfo } from "@/service/store";
 
 export default function ProfileScreen() {
-  const [isOpen, setIsOpen] = useState(true);
+  const [storeName, setStoreName] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+  const [branchType, setBranchType] = useState<string>("");
   const router = useRouter();
   const { logout, getMerchantId } = useAuth();
   const isNavigatingRef = useRef(false);
@@ -50,6 +53,25 @@ export default function ProfileScreen() {
     return <CreateStore />;
   }
 
+  useEffect(() => {
+    let isMounted = true;
+    const loadPos = async () => {
+      try {
+        const pos = await GetPosInfo();
+        if (!isMounted) return;
+        setStoreName(pos?.Name || "");
+        setPhone(pos?.Phone || "");
+        setBranchType(pos?.BranchType || "");
+      } catch {
+        // keep default
+      }
+    };
+    loadPos();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <Layout>
       {/* ส่วนบน: รูปโปรไฟล์ + ชื่อร้าน + เวลา + ปุ่มเปิด/ปิด */}
@@ -59,13 +81,10 @@ export default function ProfileScreen() {
           style={styles.profileImage}
         />
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={styles.shopName}>ร้านก๋วยเตี๋ยวป้าแดง</Text>
-          <Text style={styles.shopTime}>เวลาเปิด–ปิด: 09:00 - 20:00</Text>
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>{isOpen ? "เปิดร้าน" : "ปิดร้าน"}</Text>
-            <Switch value={isOpen} onValueChange={setIsOpen} />
-          </View>
+          <Text style={styles.shopName}>{storeName || "ชื่อร้าน"}</Text>
+          <Text style={styles.shopTime}>
+            ประเภทสาขา: {branchType || "-"}   เบอร์: {phone || "-"}
+          </Text>
         </View>
       </View>
 
@@ -112,6 +131,11 @@ export default function ProfileScreen() {
           icon={<MaterialIcons name="insights" size={22} color="#1f2937" />}
           label="รายงานการขาย"
           onPress={() => guardedPush("/page/profile/SalesReport")} />
+        
+        <MenuItem
+          icon={<MaterialIcons name="rate-review" size={22} color="#1f2937" />}
+          label="review"
+          onPress={() => guardedPush("/page/profile/Review")} />
         
         <MenuItem
           icon={<MaterialIcons name="logout" size={22} color="#dc2626" />}

@@ -1,11 +1,32 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { GetPosInfo } from '@/service/store';
 
 export default function InfoStore() {
-  const [shopName, setShopName] = useState('ร้านก๋วยเตี๋ยวป้าแดง');
-  const [openTime, setOpenTime] = useState('09:00');
-  const [closeTime, setCloseTime] = useState('20:00');
+  const [shopName, setShopName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [branchType, setBranchType] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadPos = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const pos = await GetPosInfo();
+        setShopName(pos?.Name || '');
+        setPhone(pos?.Phone || '');
+        setBranchType(pos?.BranchType || '');
+      } catch (e: any) {
+        setError(e?.message || 'โหลดข้อมูลร้านไม่สำเร็จ');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadPos();
+  }, []);
 
   const handleSave = () => {
     setModalVisible(true);
@@ -24,30 +45,28 @@ export default function InfoStore() {
           onChangeText={setShopName}
         />
 
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.label]}>เวลาเปิด</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="เช่น 09:00"
-              value={openTime}
-              onChangeText={setOpenTime}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.label]}>เวลาปิด</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="เช่น 20:00"
-              value={closeTime}
-              onChangeText={setCloseTime}
-            />
-          </View>
-        </View>
+        <Text style={styles.label}>เบอร์โทร</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="กรอกเบอร์โทร"
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
+
+        <Text style={styles.label}>ประเภทร้าน (BranchType)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="เช่น mobile"
+          value={branchType}
+          onChangeText={setBranchType}
+        />
 
         <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85}>
-          <Text style={styles.saveText}>บันทึกข้อมูล</Text>
+          <Text style={styles.saveText}>{loading ? 'กำลังโหลด...' : 'บันทึกข้อมูล'}</Text>
         </TouchableOpacity>
+
+        {!!error && <Text style={{ color: '#b91c1c', marginTop: 8 }}>{error}</Text>}
       </View>
 
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
@@ -55,7 +74,9 @@ export default function InfoStore() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>บันทึกสำเร็จ!</Text>
             <Text style={styles.modalText}>
-              ชื่อร้าน: {shopName}{'\n'}เวลาเปิด–ปิด: {openTime} - {closeTime}
+              ชื่อร้าน: {shopName}{'\n'}
+              ประเภทสาขา: {branchType || '-'}{'\n'}
+              เบอร์โทร: {phone || '-'}
             </Text>
             <TouchableOpacity style={styles.modalButton} onPress={() => setModalVisible(false)} activeOpacity={0.85}>
               <Text style={styles.modalButtonText}>ตกลง</Text>

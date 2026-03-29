@@ -1,6 +1,38 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = "https://independence-legislature-vehicle-feof.trycloudflare.com/api/v1";
+const BASE_URL = "http://36392702-688e-41b5-a3e0-c23bd85e0b29.cloud.ce.kmitl.ac.th/api/v1";
+
+// Postman working endpoint for menu create:
+// POST /api/v1/menu
+const MENU_CREATE_ENDPOINT = `${BASE_URL}/menu`;
+
+// Backend may return URI with "localhost:9000/..." and we must replace it
+// with this public base.
+const MENU_URI_BASE = "http://36392702-688e-41b5-a3e0-c23bd85e0b29.cloud.ce.kmitl.ac.th/minio/ladqueue";
+
+// Jenkins-like CSRF protection: "No valid crumb was included in the request"
+// Response from /crumbIssuer/api/json looks like: { "crumb": "...." }
+const CSRF_CRUMB_ISSUER_URL = (() => {
+  // BASE_URL = ".../api/v1" -> base host = "..."
+  const base = BASE_URL.split("/api/v1")[0];
+  return `${base}/crumbIssuer/api/json`;
+})();
+
+const buildCookieHeaderFromSetCookie = (setCookieHeader: string): string => {
+  // `set-cookie` header may include attributes; Cookie header expects `name=value; name2=value2`.
+  // We take only `name=value` pairs (ignores attributes like Path/HttpOnly/Expires).
+  const parts = setCookieHeader
+    .split(/,(?=[^;]+=[^;]+)/g) // split by comma that looks like "a=b, c=d"
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const kvPairs: string[] = [];
+  for (const part of parts) {
+    const match = part.match(/^([^=;]+)=([^;]+)/);
+    if (match) kvPairs.push(`${match[1]}=${match[2]}`);
+  }
+  return kvPairs.join("; ");
+};
 
 const getAuthHeaders = async () => {
     try {
@@ -29,6 +61,30 @@ const getAuthHeaders = async () => {
             Accept: "application/json",
             "Content-Type": "application/json",
         };
+    }
+};
+
+// Normalize/resolve image URL returned by backend to public MinIO base.
+// - Accepts absolute URLs, localhost URLs, or relative paths like "menu/abc.jpg"
+// - Ensures final URL looks like: `${MENU_URI_BASE}/menu/abc.jpg`
+export const resolveMenuImageUrl = (image?: string | null): string => {
+    try {
+        if (!image || typeof image !== "string") return "";
+        const base = MENU_URI_BASE.replace(/\/+$/, "");
+        // If absolute URL:
+        if (/^https?:\/\//i.test(image)) {
+            // Replace localhost host (with or without /ladqueue) to public base
+            return image
+                .replace(/localhost:9000\/ladqueue/gi, base)
+                .replace(/localhost:9000/gi, base);
+        }
+        // Relative path:
+        // Trim leading slashes and any leading "ladqueue/" to avoid duplication
+        let path = image.replace(/^\/+/, "");
+        path = path.replace(/^ladqueue\//i, "");
+        return `${base}/${path}`;
+    } catch {
+        return image || "";
     }
 };
 
@@ -111,49 +167,97 @@ export const MenuCategories = async (): Promise<MenuCategory[]> => {
     }
 };
   
-// Types for creating menu
-export interface CreateMenuOptionSub {
-    display: number;
-    is_active: boolean;
-    is_default: boolean;
-    name: string;
-    price: number;
-}
-
-export interface CreateMenuOption {
-    display: number;
-    is_active: boolean;
-    is_required: boolean;
-    max: number;
-    min: number;
-    name: string;
-    subs: CreateMenuOptionSub[];
-    type: string;
-}
-
-export interface CreateMenuPayload {
+// Types for creating menu (multipart): { data: [ {...} ], image: <file> }
+export interface CreateMenuDataItem {
     category_id: number;
     detail: string;
-    image: string;
     name: string;
-    options?: CreateMenuOption[]; // optional; default to [] when sending
+    options: any[]; // keep flexible because option shape depends on backend contract
     price: number;
+}
+
+export interface CreateMenuRequestPayload {
+    data: CreateMenuDataItem[];
+    imageUri?: string | null;
+}
+
+export interface CreateMenuResponse {
+  URI: string;
 }
 
 // Create a new menu
-export const CreateMenu = async (payload: CreateMenuPayload) => {
+export const CreateMenu = async (payload: CreateMenuRequestPayload) => {
     try {
-        const headers = await getAuthHeaders();
-        const bodyToSend = {
-            ...payload,
-            options: payload.options ?? [],
+        // Send multipart exactly like Postman: only `data` and `image`.
+        // For CSRF crumb, we need cookies/session, but we still avoid Authorization
+        // to prevent "multiple authentication types" errors.
+        const headers: Record<string, string> = {
+            Accept: "application/json",
         };
 
-        const response = await fetch(`${BASE_URL}/Menu`, {
+        // CSRF protection (Jenkins-like): must send a valid "crumb".
+        // crumb requires a session cookie, so we reuse stored auth_cookies.
+        const rawCookies = await AsyncStorage.getItem("auth_cookies");
+        const cookieHeader = rawCookies
+          ? buildCookieHeaderFromSetCookie(rawCookies)
+          : "";
+
+        let crumb: string | null = null;
+        if (cookieHeader) {
+          try {
+            const crumbRes = await fetch(CSRF_CRUMB_ISSUER_URL, {
+              method: "GET",
+              headers: {
+                Accept: "application/json",
+                Cookie: cookieHeader,
+              },
+              credentials: "omit",
+            });
+
+            if (crumbRes.ok) {
+              const crumbJson: any = await crumbRes.json();
+              if (typeof crumbJson?.crumb === "string") crumb = crumbJson.crumb;
+            }
+          } catch {
+            // If crumb fetch fails, POST will return 403; we surface that below.
+          }
+        }
+
+        const credentials: RequestCredentials = "omit";
+        if (cookieHeader) headers.Cookie = cookieHeader;
+        if (crumb) {
+          // Common header name for Jenkins CSRF crumb
+          headers["Jenkins-Crumb"] = crumb;
+          // Some servers also accept alternatives
+          headers["X-CSRF-Token"] = crumb;
+        }
+
+        const formData = new FormData();
+
+        // Postman in many cases sends `data` as an object (not array) even though
+        // the spec you provided earlier uses an array. To be tolerant:
+        // - if only 1 item, send object
+        // - otherwise, send array
+        const dataValue =
+            payload.data.length === 1 ? payload.data[0] : payload.data;
+        formData.append("data", JSON.stringify(dataValue));
+
+        if (payload.imageUri) {
+            const uri = payload.imageUri;
+            const ext = uri.split(".").pop()?.toLowerCase() || "jpg";
+            const type =
+                ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+            const name = `menu.${ext}`;
+
+            // RN's FormData typing differs across TS setups; cast to satisfy TS.
+            formData.append("image", { uri, type, name } as any);
+        }
+
+        const response = await fetch(MENU_CREATE_ENDPOINT, {
             method: "POST",
             headers,
-            credentials: "include",
-            body: JSON.stringify(bodyToSend),
+            credentials,
+            body: formData,
         });
 
         if (!response.ok) {
@@ -161,20 +265,24 @@ export const CreateMenu = async (payload: CreateMenuPayload) => {
             throw new Error(`สร้างเมนูไม่สำเร็จ: ${errText}`);
         }
 
-        // Safely handle empty or non-JSON responses
-        const contentType = response.headers.get("content-type") || "";
-        if (response.status === 204) {
-            return null as any;
+        if (response.status === 204) return null as any;
+
+        // Backend example response: { "URI": "..." }
+        try {
+          const json = (await response.json()) as Partial<CreateMenuResponse>;
+          if (typeof json.URI === "string") {
+            // Replace only the host part from "localhost:9000" to the real public base.
+            json.URI = json.URI.replace(
+              "localhost:9000",
+              MENU_URI_BASE.replace(/\/+$/, "")
+            );
+          }
+          return json as CreateMenuResponse;
+        } catch {
+          // Fallback: some runtimes may return non-json body.
+          const text = await response.text();
+          return { URI: text } as any;
         }
-        if (contentType.includes("application/json")) {
-            try {
-                return await response.json();
-            } catch {
-                return null as any;
-            }
-        }
-        const text = await response.text();
-        return (text && text.length > 0 ? text : null) as any;
     } catch (error) {
         console.error("เกิดข้อผิดพลาดขณะสร้างเมนู:", error);
         throw error;
@@ -283,6 +391,70 @@ export const GetTimeSlot = async (branchId: string) => {
     }
   };
 
+export interface PutPosTimeSlotPayload {
+    id: string;
+    interval_minutes: number;
+    capacity: number;
+    start_at: string; // HH:mm:ss
+    end_at: string;   // HH:mm:ss
+}
+
+// Update TimeSlot configuration for POS
+export const PutPosTimeSlot = async (payload: PutPosTimeSlotPayload) => {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${BASE_URL}/Pos/Config/TimeSlot`, {
+            method: "PUT",
+            headers,
+            credentials: "include",
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`อัปเดต TimeSlot ไม่สำเร็จ: ${errText}`);
+        }
+
+        const contentType = response.headers.get("content-type") || "";
+        if (response.status === 204) return null as any;
+        if (contentType.includes("application/json")) {
+            return await response.json();
+        }
+        const text = await response.text();
+        return (text && text.length > 0 ? text : null) as any;
+    } catch (error) {
+        console.error('เกิดข้อผิดพลาดขณะอัปเดต TimeSlot (PUT):', error);
+        throw error;
+    }
+};
+
+// -------- POS (store) info --------
+export interface PosInfo {
+    Name: string;
+    BranchType: string;
+    Categories: any; // backend may return null or array; keep flexible
+    Phone: string;
+}
+
+export const GetPosInfo = async (): Promise<PosInfo> => {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${BASE_URL}/Pos`, {
+            method: "GET",
+            headers,
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`ไม่สามารถดึงข้อมูลร้าน (POS) ได้: ${errText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('เกิดข้อผิดพลาดขณะดึงข้อมูล POS:', error);
+        throw error;
+    }
+};
+
 export interface PostTimeSlotPayload {
     interval_minutes: number;
     capacity: number;
@@ -293,7 +465,7 @@ export interface PostTimeSlotPayload {
 export const PostTimeSlot = async (payload: PostTimeSlotPayload) => {
     try {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${BASE_URL}/Branch/Config/TimeSlot`, {
+        const response = await fetch(`${BASE_URL}/Pos/Config/TimeSlot`, {
             method: "POST",
             headers,
             credentials: "include",

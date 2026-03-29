@@ -1,5 +1,5 @@
 // services/otpService.ts
-const BASE_URL = "https://independence-legislature-vehicle-feof.trycloudflare.com/api/v1";
+const BASE_URL = "http://36392702-688e-41b5-a3e0-c23bd85e0b29.cloud.ce.kmitl.ac.th/api/v1";
 
 export const sendOtp = async (phone: string) => {
   try {
@@ -63,12 +63,16 @@ export const verifyPhone = async (phone: string, otp: string) => {
       
       for (const pattern of cookiePatterns) {
         const match = cookies.match(pattern);
-        if (match) {
-          const jwtToken = match[1];
-          console.log("JWT Token extracted from cookie:", jwtToken);
-          result.jwtToken = jwtToken;
-          break;
-        }
+        if (!match) continue;
+
+        const candidate = match[1];
+        // Only accept real JWT: should have 3 segments separated by "."
+        const isJWT = typeof candidate === "string" && candidate.split(".").length === 3;
+        if (!isJWT) continue;
+
+        console.log("JWT Token extracted from cookie:", candidate);
+        result.jwtToken = candidate;
+        break;
       }
     }
 

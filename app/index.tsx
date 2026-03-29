@@ -108,9 +108,13 @@ export default function LoginScreen() {
       console.log("JWT Token from result:", result.jwtToken);
       console.log("Cookies from result:", result.cookies);
 
-      // Store the token from the response
-      if (result.token) {
-        await authLogin(result.token);
+      // Store the token from the response (JWT expected)
+      const resultToken = typeof result?.token === "string" ? result.token : null;
+      const resultTokenIsJWT =
+        typeof resultToken === "string" && resultToken.split(".").length === 3;
+
+      if (resultTokenIsJWT) {
+        await authLogin(resultToken);
         Alert.alert("เข้าสู่ระบบสำเร็จ");
         setIsNavigating(true);
         // Small delay to ensure token is stored

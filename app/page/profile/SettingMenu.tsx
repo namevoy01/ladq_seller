@@ -1,25 +1,26 @@
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  CreateMenu,
-  MenuAll,
-  MenuCategories,
-  MenuCategory,
-  UpdateMenu,
-  UpdateMenuPayload,
+    CreateMenu,
+    MenuAll,
+    MenuCategories,
+    MenuCategory,
+    resolveMenuImageUrl,
+    UpdateMenu,
+    UpdateMenuPayload,
 } from "@/service/store";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
-  FlatList,
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    FlatList,
+    Image,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 const DEFAULT_IMAGE_URL =
@@ -110,10 +111,10 @@ export default function SettingMenu() {
           id: item.ID,
           name: item.Name,
           price: item.Price,
-          image:
-            item.Image && item.Image.startsWith("http")
-              ? item.Image
-              : DEFAULT_IMAGE_URL,
+          image: (() => {
+            const resolved = resolveMenuImageUrl(item.Image);
+            return resolved && resolved.length > 0 ? resolved : DEFAULT_IMAGE_URL;
+          })(),
           detail: item.Detail,
           category_id: item.Category,
           options: item.Option || [],
@@ -174,23 +175,33 @@ export default function SettingMenu() {
         return;
       }
 
+      // API contract (multipart): { data: [ { ...menu fields..., options: [] } ], image: <file> }
       const payload = {
-        category_id: Number(menuCategoryId) || 1,
-        detail: menuDetail,
-        image: menuImage || DEFAULT_IMAGE_URL,
-        name: menuName,
-        price: Number(menuPrice),
-        options: [],
+        data: [
+          {
+            category_id: Number(menuCategoryId) || 1,
+            detail: menuDetail,
+            name: menuName,
+            options: [],
+            price: Number(menuPrice),
+          },
+        ],
+        imageUri: menuImage || null,
       };
 
       const created = await CreateMenu(payload);
       const newItem: MenuItem = {
-        id: (created?.id ?? Date.now()).toString(),
-        name: created?.name ?? payload.name,
-        price: created?.price ?? payload.price,
-        image: created?.image || payload.image,
-        detail: created?.detail ?? payload.detail,
-        category_id: created?.category_id ?? payload.category_id,
+        id: Date.now().toString(),
+        name: menuName,
+        price: Number(menuPrice),
+        image: (() => {
+          const fromCreate = resolveMenuImageUrl(created?.URI || "");
+          const fromLocal = payload.imageUri || "";
+          const resolved = fromCreate || resolveMenuImageUrl(fromLocal);
+          return resolved && resolved.length > 0 ? resolved : DEFAULT_IMAGE_URL;
+        })(),
+        detail: menuDetail,
+        category_id: Number(menuCategoryId) || 1,
         options: menuOptions,
       };
 
@@ -286,10 +297,10 @@ export default function SettingMenu() {
             id: item.ID,
             name: item.Name,
             price: item.Price,
-            image:
-              item.Image && item.Image.startsWith("http")
-                ? item.Image
-                : DEFAULT_IMAGE_URL,
+            image: (() => {
+              const resolved = resolveMenuImageUrl(item.Image);
+              return resolved && resolved.length > 0 ? resolved : DEFAULT_IMAGE_URL;
+            })(),
             detail: item.Detail,
             category_id: item.Category,
             options: item.Option || [],
@@ -400,10 +411,7 @@ export default function SettingMenu() {
     <View style={styles.card}>
       <Image
         source={{
-          uri:
-            item.image && item.image.startsWith("http")
-              ? item.image
-              : DEFAULT_IMAGE_URL,
+          uri: item.image && item.image.length > 0 ? item.image : DEFAULT_IMAGE_URL,
         }}
         style={styles.menuImage}
       />
