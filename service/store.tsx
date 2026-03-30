@@ -486,6 +486,37 @@ export const GetSalesReport = async (startDate: string, endDate: string): Promis
     }
 };
 
+// -------- Reviews --------
+export interface BranchReview {
+  id: string;
+  order_id: string;
+  user_id: string;
+  rating: number;
+  comment: string | null;
+  image: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const GetBranchReviews = async (branchId: string): Promise<BranchReview[]> => {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${BASE_URL}/Review/Branch/${encodeURIComponent(branchId)}`, {
+      method: "GET",
+      headers,
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`โหลดรีวิวไม่สำเร็จ: ${text}`);
+    }
+    return (await res.json()) as BranchReview[];
+  } catch (e) {
+    console.error("GetBranchReviews error:", e);
+    throw e;
+  }
+};
+
 export interface PutPosPayload {
     name: string;
     phone: string;

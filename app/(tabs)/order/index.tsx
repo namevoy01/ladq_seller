@@ -15,7 +15,6 @@ import {
   FlatList,
   ScrollView,
   StyleSheet,
-  Switch,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -392,17 +391,7 @@ export default function OrderScreen() {
       {/* Content */}
       {selected === 0 && (
         <View>
-          {/* Switch row */}
-          <View style={styles.switchRow}>
-            <TextComponent style={styles.switchLabel}>{isSwitchOn ? 'เปิดรับออเดอร์อัตโนมัติ' : 'ปิดรับออเดอร์อัตโนมัติ'}</TextComponent>
-            <Switch
-              value={isSwitchOn}
-              onValueChange={setIsSwitchOn}
-              trackColor={{ false: "#d1d5db", true: "#C42127" }}
-              thumbColor="#fff"
-              style={{ transform: [{ scaleX: 1.5 }, { scaleY: 1.5 }], marginStart: 8 }}
-            />
-          </View>
+          {/* Switch row removed as requested */}
 
           {/* Loading state */}
           {loading && (

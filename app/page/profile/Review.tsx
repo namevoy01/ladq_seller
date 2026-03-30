@@ -1,50 +1,72 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-
-type Review = {
-  id: string;
-  user: string;
-  rating: number; // 1-5
-  comment: string;
-  createdAt: string;
-};
+import { GetBranchReviews, BranchReview } from "@/service/store";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ReviewScreen() {
-  const mockReviews: Review[] = useMemo(
-    () => [
-      {
-        id: "r1",
-        user: "ลูกค้าท่านที่ 1",
-        rating: 5,
-        comment: "อร่อยมาก เส้นกำลังดี!",
-        createdAt: "2026-03-20T10:00:00.000Z",
-      },
-      {
-        id: "r2",
-        user: "ลูกค้าท่านที่ 2",
-        rating: 4,
-        comment: "รสชาติดี บริการโอเค",
-        createdAt: "2026-03-21T12:30:00.000Z",
-      },
-    ],
-    []
-  );
+  const { getBranchId } = useAuth();
+  const [reviews, setReviews] = useState<BranchReview[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const branchId = getBranchId();
+        if (!branchId) {
+          setError("ไม่พบรหัสสาขา");
+          setLoading(false);
+          return;
+        }
+        const data = await GetBranchReviews(branchId);
+        setReviews(Array.isArray(data) ? data : []);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "ไม่สามารถโหลดรีวิวได้");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [getBranchId]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>review</Text>
+      <Text style={styles.title}>รีวิว</Text>
+
+      {loading && (
+        <View style={styles.card}>
+          <Text>กำลังโหลดรีวิว...</Text>
+        </View>
+      )}
+      {error && !loading && (
+        <View style={styles.card}>
+          <Text style={{ color: "#b91c1c" }}>{error}</Text>
+        </View>
+      )}
 
       <View style={styles.list}>
-        {mockReviews.map((r) => (
-          <View key={r.id} style={styles.card}>
-            <Text style={styles.user}>{r.user}</Text>
-            <Text style={styles.rating}>ให้คะแนน: {r.rating}/5</Text>
-            <Text style={styles.comment}>{r.comment}</Text>
-            <Text style={styles.date}>
-              {new Date(r.createdAt).toLocaleDateString("th-TH")}
-            </Text>
+        {!loading && !error && reviews.length === 0 && (
+          <View style={styles.card}>
+            <Text style={{ color: "#6b7280" }}>ยังไม่มีรีวิว</Text>
           </View>
-        ))}
+        )}
+        {reviews.map((r) => {
+          const stars = "★★★★★☆☆☆☆☆".slice(5 - Math.min(5, Math.max(0, r.rating))), x=1;
+          const date = new Date(r.created_at).toLocaleString("th-TH", {
+            dateStyle: "short",
+            timeStyle: "short",
+          });
+          return (
+            <View key={r.id} style={styles.card}>
+              <Text style={styles.user}>ออเดอร์: {r.order_id.slice(0, 8)}</Text>
+              <Text style={styles.rating}>ให้คะแนน: {r.rating}/5</Text>
+              <Text style={styles.comment}>{r.comment || "-"}</Text>
+              <Text style={styles.date}>{date}</Text>
+            </View>
+          );
+        })}
       </View>
     </ScrollView>
   );
