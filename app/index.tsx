@@ -1,4 +1,3 @@
-import GoogleMap from "@/components/GoogleMap";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendOtp, verifyPhone } from "@/service/otp";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -166,16 +165,13 @@ export default function LoginScreen() {
       {step === "phone" ? (
         <>
           <Text style={styles.title}>Login ด้วยเบอร์มือถือ</Text>
-          <View style={styles.mapWrapper}>
-            {/* สามารถเปลี่ยนตำแหน่งร้านได้ตามต้องการ */}
-            <GoogleMap latitude={13.7563} longitude={100.5018} zoom={15} height={180} />
-          </View>
           <TextInput
             style={styles.input}
             placeholder="กรอกเบอร์มือถือ เช่น 0987654321"
             keyboardType="phone-pad"
+            maxLength={10}
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(text) => setPhone(text.replace(/[^0-9]/g, ""))}
           />
           <Button title={loading ? "กำลังส่ง..." : "ส่ง OTP"} onPress={handleSendOtp} disabled={loading || isNavigating} />
         </>
@@ -209,11 +205,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
-  },
-  mapWrapper: {
-    marginBottom: 20,
-    borderRadius: 16,
-    overflow: "hidden",
   },
   input: {
     borderWidth: 1,

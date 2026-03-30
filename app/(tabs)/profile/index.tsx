@@ -92,7 +92,11 @@ export default function ProfileScreen() {
       <View style={styles.mapCard}>
         <Text style={styles.mapTitle}>ตำแหน่งร้านบนแผนที่</Text>
         {/* TODO: ปรับ latitude / longitude เป็นค่าจริงจากข้อมูลร้าน เมื่อมี API */}
-        <GoogleMap latitude={13.7563} longitude={100.5018} />
+        <GoogleMap
+          latitude={13.7563}
+          longitude={100.5018}
+          onPress={() => guardedPush(`/page/profile/FullMap?lat=${13.7563}&lng=${100.5018}&zoom=16`)}
+        />
         <View style={styles.mapActions}>
           <TouchableOpacity
             style={styles.mapButton}

@@ -1,6 +1,7 @@
 import { useText } from '@/app/_layout';
 import NewOrder from '@/app/page/order/NewOrder';
 import SendOrder from '@/app/page/order/SendOrder';
+import { useAuth } from '@/contexts/AuthContext';
 import { completeOrder, getCookOrders } from '@/service/order';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -59,6 +60,7 @@ type Order = {
 const { height } = Dimensions.get('window');
 
 export default function OrderScreen() {
+  const { getUserId } = useAuth();
   const [selected, setSelected] = useState(0);
   const buttons = ["ออเดอร์", "ออเดอร์รอส่ง", "ออเดอร์ใหม่"];
   const TextComponent = useText(); // ใช้ custom Text
