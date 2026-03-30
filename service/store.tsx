@@ -456,6 +456,36 @@ export const GetPosInfo = async (): Promise<PosInfo> => {
     }
 };
 
+// -------- Report --------
+export const GetSalesReport = async (startDate: string, endDate: string): Promise<number> => {
+    try {
+        const headers = await getAuthHeaders();
+        const url = `${BASE_URL}/Report?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+        const response = await fetch(url, {
+            method: "GET",
+            headers,
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`ไม่สามารถดึงรายงานการขายได้: ${errText}`);
+        }
+        // API ตอบเป็นตัวเลขล้วน
+        const text = await response.text();
+        const num = Number(text);
+        if (Number.isFinite(num)) return num;
+        // เผื่อบางกรณีส่ง JSON number
+        try {
+            const json = await response.json();
+            if (typeof json === "number") return json;
+        } catch {}
+        return 0;
+    } catch (error) {
+        console.error("เกิดข้อผิดพลาดขณะดึงรายงานการขาย:", error);
+        throw error;
+    }
+};
+
 export interface PutPosPayload {
     name: string;
     phone: string;
@@ -602,14 +632,33 @@ export interface PostCreateMerchantPayload {
     phone: string;
 }
 
-export const PostCreateMerchant = async (payload: PostCreateMerchantPayload) => {
+export interface PostCreateMerchantFormPayload {
+    data: PostCreateMerchantPayload;
+    imageUri?: string | null;
+}
+
+export const PostCreateMerchant = async (payload: PostCreateMerchantFormPayload) => {
     try {
         const headers = await getAuthHeaders();
+        // multipart/form-data: let fetch set boundary automatically
+        delete (headers as any)["Content-Type"];
+
+        const formData = new FormData();
+        formData.append("data", JSON.stringify(payload.data));
+        if (payload.imageUri) {
+            const uri = payload.imageUri;
+            const ext = uri.split(".").pop()?.toLowerCase() || "jpg";
+            const type =
+                ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+            const name = `merchant.${ext}`;
+            formData.append("image", { uri, type, name } as any);
+        }
+
         const response = await fetch(`${BASE_URL}/Merchant`, {
             method: "POST",
             headers,
             credentials: "include",
-            body: JSON.stringify(payload),
+            body: formData,
         });
 
         if (!response.ok) {

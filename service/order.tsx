@@ -29,6 +29,32 @@ export const getNewOrdersPagination = async (offset: number = 0, limit: number =
   }
 };
 
+// ออเดอร์ทั้งหมดในคิว (Queue)
+export const getAllQueueOrdersPagination = async (offset: number = 0, limit: number = 10) => {
+  try {
+    const response = await fetch(
+      `${BASE_URL}/Order/Pos/All/Queue/Pagination?offset=${offset}&limit=${limit}`,
+      {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching all queue orders:', error);
+    throw error;
+  }
+};
+
 export const getCompleteOrdersPagination = async (offset: number = 0, limit: number = 10) => {
   try {
     const response = await fetch(
@@ -213,6 +239,40 @@ export const cancelOrder = async (orderId: string, branchId: string) => {
     }
   } catch (error) {
     console.error('Error canceling order:', error);
+    throw error;
+  }
+};
+
+// รับออเดอร์ใหม่
+export const acceptOrder = async (id: string) => {
+  try {
+    const response = await fetch(
+      `${BASE_URL}/Order/Pos/Accept`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      return { success: true };
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { success: true, message: text };
+    }
+  } catch (error) {
+    console.error('Error accepting order:', error);
     throw error;
   }
 };

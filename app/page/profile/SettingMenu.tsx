@@ -371,7 +371,14 @@ export default function SettingMenu() {
     const newOptions = [...menuOptions];
     if (key === "Price") newOptions[index].Price = Number(value);
     else if (key === "Name") newOptions[index].Name = value;
-    else if (key === "Type") newOptions[index].Type = value;
+    else if (key === "Type") {
+      newOptions[index].Type = value;
+      // ถ้าเป็น 1 ตัวเลือก ให้ fix ค่าทันทีตาม requirement
+      if (value === "single") {
+        newOptions[index].Min = 0;
+        newOptions[index].Max = 1;
+      }
+    }
     else if (key === "Min") newOptions[index].Min = Number(value);
     else if (key === "Max") newOptions[index].Max = Number(value);
     setMenuOptions(newOptions);
@@ -515,20 +522,24 @@ export default function SettingMenu() {
           value={menuDetail}
           onChangeText={setMenuDetail}
         />
-        {menuImage ? (
-          <Image source={{ uri: menuImage }} style={styles.previewImage} />
-        ) : (
-          <Image source={{ uri: DEFAULT_IMAGE_URL }} style={styles.previewImage} />
+        {!showDelete && (
+          <>
+            {menuImage ? (
+              <Image source={{ uri: menuImage }} style={styles.previewImage} />
+            ) : (
+              <Image source={{ uri: DEFAULT_IMAGE_URL }} style={styles.previewImage} />
+            )}
+            <TouchableOpacity
+              style={styles.pickImageButton}
+              onPress={pickImageFromDevice}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.pickImageButtonText}>
+                {menuImage ? "เปลี่ยนรูปภาพ" : "เลือกรูปภาพจากเครื่อง"}
+              </Text>
+            </TouchableOpacity>
+          </>
         )}
-        <TouchableOpacity
-          style={styles.pickImageButton}
-          onPress={pickImageFromDevice}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.pickImageButtonText}>
-            {menuImage ? "เปลี่ยนรูปภาพ" : "เลือกรูปภาพจากเครื่อง"}
-          </Text>
-        </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>ตัวเลือกเพิ่มเติม</Text>
         {menuOptions && Array.isArray(menuOptions) && menuOptions.map((opt, index) => (
@@ -545,31 +556,73 @@ export default function SettingMenu() {
               </TouchableOpacity>
             </View>
 
+            <View style={styles.optionTypeWrap}>
+              <Text style={styles.optionTypeLabel}>รูปแบบการเลือก</Text>
+              <View style={styles.optionTypeRow}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[
+                    styles.optionTypeButton,
+                    opt.Type === "single" && styles.optionTypeButtonActive,
+                  ]}
+                  onPress={() => updateOption(index, "Type", "single")}
+                >
+                  <Text
+                    style={[
+                      styles.optionTypeButtonText,
+                      opt.Type === "single" && styles.optionTypeButtonTextActive,
+                    ]}
+                  >
+                    1 ตัวเลือก
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[
+                    styles.optionTypeButton,
+                    opt.Type === "multiple" && styles.optionTypeButtonActive,
+                  ]}
+                  onPress={() => updateOption(index, "Type", "multiple")}
+                >
+                  <Text
+                    style={[
+                      styles.optionTypeButtonText,
+                      opt.Type === "multiple" && styles.optionTypeButtonTextActive,
+                    ]}
+                  >
+                    หลายตัวเลือก
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View style={styles.optionTypeRow}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="ประเภท (single/multiple)"
-                value={opt.Type}
-                onChangeText={(text) => updateOption(index, "Type", text)}
-              />
-              <TextInput
-                style={[styles.input, { width: 60 }]}
-                placeholder="Min"
-                keyboardType="number-pad"
-                value={opt.Min.toString()}
-                onChangeText={(text) =>
-                  updateOption(index, "Min", onlyDigits(text))
-                }
-              />
-              <TextInput
-                style={[styles.input, { width: 60 }]}
-                placeholder="Max"
-                keyboardType="number-pad"
-                value={opt.Max.toString()}
-                onChangeText={(text) =>
-                  updateOption(index, "Max", onlyDigits(text))
-                }
-              />
+              <View style={styles.minMaxField}>
+                <Text style={styles.minMaxLabel}>ขั้นต่ำ</Text>
+                <TextInput
+                  style={[styles.input, { width: 90, marginBottom: 0 }]}
+                  placeholder="เช่น 0"
+                  keyboardType="number-pad"
+                  editable={opt.Type !== "single"}
+                  value={opt.Min.toString()}
+                  onChangeText={(text) =>
+                    updateOption(index, "Min", onlyDigits(text))
+                  }
+                />
+              </View>
+              <View style={styles.minMaxField}>
+                <Text style={styles.minMaxLabel}>สูงสุด</Text>
+                <TextInput
+                  style={[styles.input, { width: 90, marginBottom: 0 }]}
+                  placeholder="เช่น 1"
+                  keyboardType="number-pad"
+                  editable={opt.Type !== "single"}
+                  value={opt.Max.toString()}
+                  onChangeText={(text) =>
+                    updateOption(index, "Max", onlyDigits(text))
+                  }
+                />
+              </View>
             </View>
 
             <TouchableOpacity
@@ -885,6 +938,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     gap: 8,
+  },
+  minMaxField: {
+    flexDirection: "column",
+  },
+  minMaxLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 4,
+    fontWeight: "700",
+  },
+  optionTypeWrap: {
+    marginBottom: 8,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
+    padding: 10,
+  },
+  optionTypeLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  optionTypeButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 999,
+    paddingVertical: 8,
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
+  },
+  optionTypeButtonActive: {
+    borderColor: "#2563eb",
+    backgroundColor: "#eff6ff",
+  },
+  optionTypeButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#4b5563",
+  },
+  optionTypeButtonTextActive: {
+    color: "#1d4ed8",
   },
   subOptionRow: {
     flexDirection: "row",

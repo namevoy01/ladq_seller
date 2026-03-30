@@ -1,9 +1,20 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { sendOtp, verifyPhone } from "@/service/otp";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Button, StyleSheet, Text, TextInput, View } from "react-native";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -13,6 +24,39 @@ export default function LoginScreen() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+
+  useEffect(() => {
+    // Android notification channel (required for visible notifications)
+    Notifications.setNotificationChannelAsync("otp", {
+      name: "OTP",
+      importance: Notifications.AndroidImportance.HIGH,
+    }).catch(() => {});
+  }, []);
+
+  const notifyOtpSent = async (formattedPhone: string, otpCode?: string) => {
+    try {
+      const perm = await Notifications.getPermissionsAsync();
+      let status = perm.status;
+      if (status !== "granted") {
+        const req = await Notifications.requestPermissionsAsync();
+        status = req.status;
+      }
+      if (status !== "granted") {
+        Alert.alert("สำเร็จ", "ส่ง OTP ไปที่ " + formattedPhone + (otpCode ? `\nรหัส: ${otpCode}` : ""));
+        return;
+      }
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "ส่ง OTP สำเร็จ",
+          body: `ไปที่ ${formattedPhone}${otpCode ? ` • รหัส: ${otpCode}` : ""}`,
+          subtitle: otpCode ? `OTP: ${otpCode}` : undefined,
+        },
+        trigger: null,
+      });
+    } catch {
+      Alert.alert("สำเร็จ", "ส่ง OTP ไปที่ " + formattedPhone + (otpCode ? `\nรหัส: ${otpCode}` : ""));
+    }
+  };
 
   // Check if user is already authenticated
   useEffect(() => {
@@ -83,7 +127,7 @@ export default function LoginScreen() {
       const data = await sendOtp(formattedPhone);
       console.log("OTP Response:", data);
 
-      Alert.alert("สำเร็จ", "ส่ง OTP ไปที่ " + formattedPhone);
+      await notifyOtpSent(formattedPhone, (data as any)?.Otp || (data as any)?.otp);
       setStep("otp");
     } catch (error: any) {
       console.error(error);

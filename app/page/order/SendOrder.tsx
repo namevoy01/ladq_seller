@@ -1,14 +1,16 @@
 import { useText } from "@/app/_layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { closeOrder, getCompleteOrdersPagination } from "@/service/order";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  ListRenderItemInfo,
-  Text as RNText,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    ListRenderItemInfo,
+    Modal,
+    Text as RNText,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 interface Menu {
@@ -40,11 +42,14 @@ interface ApiResponse {
 
 export default function SendOrder() {
   const Text = useText();
+  const { getUserId, getUserInfo } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
+  const [arriveModalVisible, setArriveModalVisible] = useState(false);
+  const [arriveOrderId, setArriveOrderId] = useState<string | null>(null);
 
   // Fetch orders from API
   const fetchOrders = async (offset: number = 0, limit: number = 10) => {
@@ -76,6 +81,89 @@ export default function SendOrder() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // WebSocket สำหรับแจ้ง Arrive ในหน้าออเดอร์รอส่ง
+  useEffect(() => {
+    const userId =
+      getUserId?.() ||
+      getUserInfo?.()?.id ||
+      getUserInfo?.()?.userId ||
+      null;
+    if (!userId) {
+      console.warn("SendOrder WS: missing user_id");
+      return;
+    }
+
+    const base = "ws://36392702-688e-41b5-a3e0-c23bd85e0b29.cloud.ce.kmitl.ac.th";
+    const urls = [
+      `${base}/api/notification/ws?user_id=${encodeURIComponent(userId)}`,
+      `${base}/ws?user_id=${encodeURIComponent(userId)}`,
+    ];
+
+    let ws: WebSocket | null = null;
+    let connected = false;
+    let closedByUnmount = false;
+
+    const connectAt = (idx: number) => {
+      if (idx >= urls.length) {
+        console.warn("SendOrder WS: all endpoints failed");
+        return;
+      }
+      const url = urls[idx];
+      console.log("SendOrder WS connecting:", url);
+      ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        connected = true;
+        console.log("SendOrder WS connected");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data || "{}");
+          console.log("SendOrder WS message:", data);
+          const state = data?.State || data?.state;
+          if (state === "Arrive" && data?.Message) {
+            setArriveOrderId(String(data.Message));
+            setArriveModalVisible(true);
+          }
+        } catch (e) {
+          console.warn("SendOrder WS parse error:", e);
+        }
+      };
+
+      ws.onerror = (e) => {
+        console.warn("SendOrder WS error:", e);
+      };
+
+      ws.onclose = () => {
+        console.log("SendOrder WS closed");
+        if (!closedByUnmount && !connected) {
+          connectAt(idx + 1);
+        }
+      };
+    };
+
+    connectAt(0);
+
+    return () => {
+      closedByUnmount = true;
+      ws?.close();
+    };
+  }, [getUserId, getUserInfo]);
+
+  const handleArriveComplete = async () => {
+    if (!arriveOrderId) return;
+    try {
+      await closeOrder(arriveOrderId);
+      await fetchOrders(currentPage);
+      setArriveModalVisible(false);
+      setArriveOrderId(null);
+    } catch (e) {
+      console.error("Close order from Arrive failed:", e);
+      // ตั้งใจค้าง popup ต่อจนกว่าจะส่งสำเร็จ
+    }
+  };
 
   const handleSendOrder = useCallback(async (orderId: string) => {
     try {
@@ -164,15 +252,6 @@ export default function SendOrder() {
           </RNText>
         </View>
 
-        {/* ปุ่มส่งออเดอร์ */}
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[styles.button, styles.sendButton]}
-            onPress={() => handleSendOrder(item.order_id)}
-          >
-            <RNText style={styles.buttonText}>ส่งออเดอร์</RNText>
-          </TouchableOpacity>
-        </View>
       </View>
     );
   };
@@ -214,6 +293,32 @@ export default function SendOrder() {
         }
         showsVerticalScrollIndicator={false}
       />
+
+      <Modal
+        visible={arriveModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.arriveBackdrop}>
+          <View style={styles.arriveCard}>
+            <RNText style={styles.arriveTitle}>ลูกค้ามาถึงแล้ว</RNText>
+            <RNText style={styles.arriveText}>
+              กรุณากดเสร็จสิ้นเพื่อยืนยันการส่งออเดอร์
+            </RNText>
+            <RNText style={styles.arriveOrderId}>
+              Order: {arriveOrderId?.slice(0, 8)}
+            </RNText>
+            <TouchableOpacity
+              style={styles.arriveDoneButton}
+              onPress={handleArriveComplete}
+              activeOpacity={0.9}
+            >
+              <RNText style={styles.arriveDoneText}>เสร็จสิ้น</RNText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -250,20 +355,10 @@ const styles = StyleSheet.create({
   header: { backgroundColor: "#f0f0f0" },
   footer: { backgroundColor: "#ddd" },
   cell: { flex: 1, textAlign: "center", fontSize: 14 },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 10,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 10,
-    marginHorizontal: 5,
-    borderRadius: 6,
-    alignItems: "center",
-  },
-  sendButton: { backgroundColor: "#1E7D37" },
-  buttonText: { color: "#fff", fontWeight: "bold" },
+  buttonRow: {},
+  button: {},
+  sendButton: {},
+  buttonText: {},
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -331,5 +426,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     textAlign: "center",
+  },
+  arriveBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  arriveCard: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 18,
+  },
+  arriveTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  arriveText: {
+    fontSize: 14,
+    color: "#374151",
+    textAlign: "center",
+  },
+  arriveOrderId: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginTop: 8,
+    marginBottom: 14,
+    textAlign: "center",
+  },
+  arriveDoneButton: {
+    backgroundColor: "#16a34a",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  arriveDoneText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 15,
   },
 });

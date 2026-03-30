@@ -1,6 +1,6 @@
 import { useText } from "@/app/_layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { cancelOrder, getNewOrdersPagination } from "@/service/order";
+import { acceptOrder, cancelOrder, getNewOrdersPagination } from "@/service/order";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -124,6 +124,17 @@ export default function NewOrder() {
     }
   };
 
+  const handleAcceptOrder = async (orderId: string) => {
+    try {
+      await acceptOrder(orderId);
+      Alert.alert("สำเร็จ", "รับออเดอร์เรียบร้อย");
+      await fetchOrders(currentPage);
+    } catch (error) {
+      console.error("Error accepting order:", error);
+      Alert.alert("ผิดพลาด", "รับออเดอร์ไม่สำเร็จ");
+    }
+  };
+
   const renderOrder = ({ item, index }: ListRenderItemInfo<Order>) => {
     const formatTime = (dateString: string) => {
       const date = new Date(dateString);
@@ -207,7 +218,10 @@ export default function NewOrder() {
         {/* Buttons สำหรับบิลแก้ไขได้ */}
         {index === firstEditableIndex && (
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={[styles.button, styles.acceptButton]}>
+            <TouchableOpacity
+              style={[styles.button, styles.acceptButton]}
+              onPress={() => handleAcceptOrder(item.order_id)}
+            >
               <RNText style={styles.buttonText}>รับ</RNText>
             </TouchableOpacity>
             <TouchableOpacity

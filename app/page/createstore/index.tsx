@@ -1,9 +1,11 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { PostCreateMerchant, PostCreateMerchantPayload } from '@/service/store';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     Dimensions,
+    Image,
     Platform,
     SafeAreaView,
     ScrollView,
@@ -17,7 +19,6 @@ import {
 
 export default function CreateStore() {
   const { width } = Dimensions.get('window');
-  const [activeTab, setActiveTab] = useState('create');
   const { logout } = useAuth();
   const router = useRouter();
   
@@ -33,6 +34,7 @@ export default function CreateStore() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [storeImage, setStoreImage] = useState<string>('');
   // Removed ownerInfo state
 
   const handleStoreInfoChange = (field: string, value: string) => {
@@ -40,6 +42,27 @@ export default function CreateStore() {
   };
 
   // Removed handleOwnerInfoChange function
+
+  const pickImageFromDevice = async () => {
+    try {
+      if (Platform.OS === 'ios') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          alert('กรุณาอนุญาตการเข้าถึงรูปภาพ');
+          return;
+        }
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setStoreImage(result.assets[0].uri);
+      }
+    } catch {
+      alert('ไม่สามารถเลือกรูปได้');
+    }
+  };
 
   const handleSubmit = async () => {
     try {
@@ -66,11 +89,15 @@ export default function CreateStore() {
       };
 
       // Call API
-      const result = await PostCreateMerchant(payload);
+      const result = await PostCreateMerchant({
+        data: payload,
+        imageUri: storeImage || null,
+      });
       console.log('Create merchant result:', result);
       
-      // Success - redirect to profile or refresh
-      router.replace('/(tabs)/profile');
+      // Success - force relogin
+      await logout();
+      router.replace('/');
     } catch (err: any) {
       setError(err?.message || 'เกิดข้อผิดพลาดในการสร้างร้านค้า');
     } finally {
@@ -89,24 +116,13 @@ export default function CreateStore() {
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-        {/* Segmented Control */}
+        {/* Single title: create store only */}
         <View style={[styles.segmentedControl, { marginHorizontal: getMarginHorizontal(), marginTop: 20 }]}>
-          <TouchableOpacity
-            style={[styles.segmentButton, activeTab === 'create' && styles.activeSegment]}
-            onPress={() => setActiveTab('create')}
-          >
-            <Text style={[styles.segmentText, activeTab === 'create' && styles.activeSegmentText]}>
+          <View style={[styles.segmentButton, styles.activeSegment]}>
+            <Text style={[styles.segmentText, styles.activeSegmentText]}>
               สร้างร้านค้า
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segmentButton, activeTab === 'claim' && styles.activeSegment]}
-            onPress={() => setActiveTab('claim')}
-          >
-            <Text style={[styles.segmentText, activeTab === 'claim' && styles.activeSegmentText]}>
-              เคลมร้านค้า
-            </Text>
-          </TouchableOpacity>
+          </View>
         </View>
         </View>
 
@@ -186,6 +202,22 @@ export default function CreateStore() {
               keyboardType="phone-pad"
             />
           </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>รูปภาพร้านค้า :</Text>
+            {storeImage ? (
+              <Image source={{ uri: storeImage }} style={styles.previewImage} />
+            ) : (
+              <View style={styles.previewPlaceholder}>
+                <Text style={styles.previewPlaceholderText}>ยังไม่ได้เลือกรูป</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.pickImageButton} onPress={pickImageFromDevice}>
+              <Text style={styles.pickImageButtonText}>
+                {storeImage ? 'เปลี่ยนรูปภาพ' : 'เลือกรูปภาพจากเครื่อง'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Owner Information Section removed */}
@@ -197,7 +229,7 @@ export default function CreateStore() {
           disabled={loading}
         >
           <Text style={styles.submitButtonText}>
-            {loading ? 'กำลังสร้างร้านค้า...' : (activeTab === 'create' ? 'สร้างร้านค้า' : 'เคลมร้านค้า')}
+            {loading ? 'กำลังสร้างร้านค้า...' : 'สร้างร้านค้า'}
           </Text>
         </TouchableOpacity>
 
@@ -287,6 +319,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  previewImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+    marginBottom: 10,
+    backgroundColor: '#f3f4f6',
+  },
+  previewPlaceholder: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+    marginBottom: 10,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  previewPlaceholderText: {
+    color: '#6b7280',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  pickImageButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  pickImageButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   mapInput: {
     backgroundColor: 'white',

@@ -2,11 +2,13 @@ import { useText } from '@/app/_layout';
 import NewOrder from '@/app/page/order/NewOrder';
 import SendOrder from '@/app/page/order/SendOrder';
 import { useAuth } from '@/contexts/AuthContext';
-import { completeOrder, getCookOrders } from '@/service/order';
+import { closeOrder, completeOrder, getCookOrders } from '@/service/order';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter, type Href } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   Dimensions,
   FlatList,
@@ -60,6 +62,7 @@ const { height } = Dimensions.get('window');
 
 export default function OrderScreen() {
   const { getUserId } = useAuth();
+  const router = useRouter();
   const [selected, setSelected] = useState(0);
   const buttons = ["ออเดอร์", "ออเดอร์รอส่ง", "ออเดอร์ใหม่"];
   const TextComponent = useText(); // ใช้ custom Text
@@ -67,18 +70,48 @@ export default function OrderScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [newOrderRefreshKey, setNewOrderRefreshKey] = useState(0);
+  const [ws, setWs] = useState<WebSocket | null>(null);
 
   // แปลงข้อมูลจาก API เป็น format ของ UI
   const transformApiOrderToUiOrder = useCallback((apiOrder: ApiOrder): Order => {
+    const items = apiOrder.order_item.map((item) => {
+      const baseName = item.menu.menu_name;
+      let extraPrice = 0;
+      const optionLabels: string[] = [];
+
+      if (Array.isArray(item.order_item_option)) {
+        item.order_item_option.forEach((opt: any) => {
+          const g = opt?.SubOptionGroupMenu;
+          if (g && g.option_group_menu_name && g.sub_option_group_menu_name) {
+            optionLabels.push(
+              `${g.option_group_menu_name}: ${g.sub_option_group_menu_name}`
+            );
+            if (typeof g.sub_option_group_menu_price === "number") {
+              extraPrice += g.sub_option_group_menu_price;
+            }
+          }
+        });
+      }
+
+      const fullName =
+        optionLabels.length > 0
+          ? `${baseName} (${optionLabels.join(", ")})`
+          : baseName;
+
+      return {
+        name: fullName,
+        qty: item.quantity,
+        // แสดงราคาเป็นราคารวมต่อรายการ (ราคาพื้นฐาน + option) x จำนวน
+        price: (item.menu.menu_price + extraPrice) * item.quantity,
+      };
+    });
+
     return {
       id: apiOrder.order_id.slice(0, 8), // ใช้ 8 ตัวแรกของ order_id สำหรับแสดง
       orderId: apiOrder.order_id, // เก็บ order_id จริงไว้สำหรับส่ง API
       customer: '', // API ไม่มี customer field
-      items: apiOrder.order_item.map(item => ({
-        name: item.menu.menu_name,
-        qty: item.quantity,
-        price: item.menu.menu_price,
-      })),
+      items,
       status: apiOrder.order_status === 'cook' ? 'in-progress' : 'pending',
     };
   }, []);
@@ -164,6 +197,85 @@ export default function OrderScreen() {
     }, [])
   );
 
+  // WebSocket สำหรับ "ออเดอร์" และ "ออเดอร์ใหม่"
+  useEffect(() => {
+    // เปิดตอนอยู่แท็บ "ออเดอร์" หรือ "ออเดอร์ใหม่"
+    if (selected !== 0 && selected !== 2) {
+      if (ws) {
+        ws.close();
+        setWs(null);
+      }
+      return;
+    }
+
+    const userId = getUserId?.();
+    if (!userId) {
+      console.warn('WebSocket: missing user_id');
+      return;
+    }
+
+    const url = `ws://36392702-688e-41b5-a3e0-c23bd85e0b29.cloud.ce.kmitl.ac.th/api/notification/ws?user_id=${encodeURIComponent(userId)}`;
+    const socket = new WebSocket(url);
+    setWs(socket);
+
+    socket.onopen = () => {
+      console.log('WS NewOrder connected');
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data || "{}");
+        console.log('WS NewOrder message:', data);
+        const state = data.State || data.state;
+        if (state === "NewOrder") {
+          setNewOrderRefreshKey((prev) => prev + 1);
+        } else if (state === "Cook") {
+          // มีออเดอร์ cook เปลี่ยนสถานะ ให้รีเฟรชหน้าออเดอร์หลัก
+          fetchCookOrders();
+        } else if (state === "Arrive" && data.Message) {
+          const orderId = String(data.Message);
+          Alert.alert(
+            "ยืนยันส่งออเดอร์",
+            "ลูกค้ามารับสินค้าแล้วใช่หรือไม่?",
+            [
+              { text: "ยังไม่ใช่", style: "cancel" },
+              {
+                text: "ยืนยันส่งแล้ว",
+                style: "default",
+                onPress: async () => {
+                  try {
+                    await closeOrder(orderId);
+                    Alert.alert("สำเร็จ", "ส่งออเดอร์เรียบร้อยแล้ว");
+                    // รีโหลดหน้าหลักเพื่ออัปเดตสถานะ
+                    await fetchCookOrders();
+                  } catch (err) {
+                    console.error("Error closing order from WS Arrive:", err);
+                    Alert.alert("ผิดพลาด", "ส่งออเดอร์ไม่สำเร็จ");
+                  }
+                },
+              },
+            ]
+          );
+        }
+      } catch (e) {
+        console.warn('WS NewOrder parse error:', e);
+      }
+    };
+
+    socket.onerror = (e) => {
+      console.warn('WS NewOrder error:', e);
+    };
+
+    socket.onclose = () => {
+      console.log('WS NewOrder closed');
+    };
+
+    return () => {
+      socket.close();
+      setWs(null);
+    };
+  }, [selected, getUserId]);
+
   // แปลง status เป็นข้อความ
   const statusText = (status: Order['status']) => {
     switch (status) {
@@ -215,12 +327,12 @@ export default function OrderScreen() {
         </TextComponent>
       </View>
 
-      {/* Cancel button */}
+      {/* Button ด้านล่างการ์ด */}
       <TouchableOpacity
         style={styles.cancelButton}
-        onPress={() => alert(`ยกเลิกออเดอร์ ${item.id}`)}
+        onPress={() => router.push('/page/order/AllQueue' as Href)}
       >
-        <TextComponent style={styles.cancelText}>ยกเลิก</TextComponent>
+        <TextComponent style={styles.cancelText}>ออเดอร์ทั้งหมด</TextComponent>
       </TouchableOpacity>
 
       {/* Slide button */}
@@ -230,13 +342,7 @@ export default function OrderScreen() {
       />
 
       {/* Summary */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryRow}>
-          <TextComponent style={styles.summaryDone}>ออเดอร์ที่สำเร็จแล้ว: 30</TextComponent>
-          <TextComponent style={styles.summaryPending}>ออเดอร์ที่เหลือ: 10</TextComponent>
-        </View>
-        <TextComponent style={styles.summaryTotal}>ออเดอร์ทั้งหมด: 40</TextComponent>
-      </View>
+      
     </View>
   );
 
@@ -255,10 +361,12 @@ export default function OrderScreen() {
                 isActive
                   ? { backgroundColor: '#C42127' }
                   : { backgroundColor: 'rgba(153, 172, 195, 0.1)', borderColor: '#99ACC3', borderWidth: 1 },
-                index === 1 && { marginStart: 5, marginEnd: 5 }
+                index === 1 && { marginStart: 5, marginEnd: 5 },
               ]}
             >
-            <TextComponent style={[styles.text, { color: isActive ? '#fff' : '#000' }]}>{label}</TextComponent>
+              <TextComponent style={[styles.text, { color: isActive ? '#fff' : '#000' }]}>
+                {label}
+              </TextComponent>
             </TouchableOpacity>
           );
         })}
@@ -338,12 +446,12 @@ export default function OrderScreen() {
                 </TextComponent>
               </View>
 
-              {/* Cancel button */}
+              {/* Button ด้านล่างการ์ด (empty state) */}
               <TouchableOpacity
                 style={[styles.cancelButton, { opacity: 0.5 }]}
-                disabled={true}
+                onPress={() => router.push('/page/order/AllQueue' as Href)}
               >
-                <TextComponent style={styles.cancelText}>ยกเลิก</TextComponent>
+                <TextComponent style={styles.cancelText}>ออเดอร์ทั้งหมด</TextComponent>
               </TouchableOpacity>
 
               {/* Slide button */}
@@ -355,20 +463,14 @@ export default function OrderScreen() {
               </View>
 
               {/* Summary */}
-              <View style={styles.summaryContainer}>
-                <View style={styles.summaryRow}>
-                <TextComponent style={styles.summaryDone}>ออเดอร์ที่สำเร็จแล้ว: 0</TextComponent>
-                <TextComponent style={styles.summaryPending}>ออเดอร์ที่เหลือ: 0</TextComponent>
-                </View>
-                <TextComponent style={styles.summaryTotal}>ออเดอร์ทั้งหมด: 0</TextComponent>
-              </View>
+             
             </View>
           )}
         </View>
       )}
 
       {selected === 1 && <SendOrder />}
-      {selected === 2 && <NewOrder />}
+      {selected === 2 && <NewOrder key={newOrderRefreshKey} />}
     </View>
   );
 }
