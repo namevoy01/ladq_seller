@@ -13,7 +13,6 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -190,30 +189,30 @@ export default function OrderScreen() {
   const renderOrder = ({ item }: { item: Order }) => (
     <View style={{ marginBottom: 16 }}>
       <View style={styles.card}>
-        <Text style={styles.id}>{item.id}</Text>
+        <TextComponent style={styles.id}>{item.id}</TextComponent>
 
         {/* Header row */}
         <View style={styles.headerRow}>
-          <Text style={[styles.headerText, { flex: 3, textAlign: 'left', paddingLeft: 20 }]}>รายการ</Text>
-          <Text style={[styles.headerText, { flex: 2, textAlign: 'center' }]}>จำนวน</Text>
-          <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>ราคา</Text>
+          <TextComponent style={[styles.headerText, { flex: 3, textAlign: 'left', paddingLeft: 20 }]}>รายการ</TextComponent>
+          <TextComponent style={[styles.headerText, { flex: 2, textAlign: 'center' }]}>จำนวน</TextComponent>
+          <TextComponent style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>ราคา</TextComponent>
         </View>
 
         {/* Items */}
         <ScrollView style={{ maxHeight: height * 0.43 }}>
           {item.items.map((it, index) => (
             <View key={`${item.id}-item-${index}-${it.name}`} style={styles.itemRow}>
-              <Text style={[styles.customer, { flex: 3, textAlign: 'left', paddingLeft: 20 }]}>{it.name}</Text>
-              <Text style={[styles.items, { flex: 2, textAlign: 'center' }]}>{it.qty}</Text>
-              <Text style={[styles.price, { flex: 1, textAlign: 'center' }]}>{it.price}</Text>
+              <TextComponent style={[styles.customer, { flex: 3, textAlign: 'left', paddingLeft: 20 }]}>{it.name}</TextComponent>
+              <TextComponent style={[styles.items, { flex: 2, textAlign: 'center' }]}>{it.qty}</TextComponent>
+              <TextComponent style={[styles.price, { flex: 1, textAlign: 'center' }]}>{it.price}</TextComponent>
             </View>
           ))}
         </ScrollView>
 
         {/* Status */}
-        <Text style={[styles.status, { paddingLeft: 20 }]}>
+        <TextComponent style={[styles.status, { paddingLeft: 20 }]}>
           รายละเอียดเพิ่มเติม : {statusText(item.status)}
-        </Text>
+        </TextComponent>
       </View>
 
       {/* Cancel button */}
@@ -221,7 +220,7 @@ export default function OrderScreen() {
         style={styles.cancelButton}
         onPress={() => alert(`ยกเลิกออเดอร์ ${item.id}`)}
       >
-        <Text style={styles.cancelText}>ยกเลิก</Text>
+        <TextComponent style={styles.cancelText}>ยกเลิก</TextComponent>
       </TouchableOpacity>
 
       {/* Slide button */}
@@ -233,10 +232,10 @@ export default function OrderScreen() {
       {/* Summary */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryDone}>ออเดอร์ที่สำเร็จแล้ว: 30</Text>
-          <Text style={styles.summaryPending}>ออเดอร์ที่เหลือ: 10</Text>
+          <TextComponent style={styles.summaryDone}>ออเดอร์ที่สำเร็จแล้ว: 30</TextComponent>
+          <TextComponent style={styles.summaryPending}>ออเดอร์ที่เหลือ: 10</TextComponent>
         </View>
-        <Text style={styles.summaryTotal}>ออเดอร์ทั้งหมด: 40</Text>
+        <TextComponent style={styles.summaryTotal}>ออเดอร์ทั้งหมด: 40</TextComponent>
       </View>
     </View>
   );
@@ -259,7 +258,7 @@ export default function OrderScreen() {
                 index === 1 && { marginStart: 5, marginEnd: 5 }
               ]}
             >
-              <Text style={[styles.text, { color: isActive ? '#fff' : '#000' }]}>{label}</Text>
+            <TextComponent style={[styles.text, { color: isActive ? '#fff' : '#000' }]}>{label}</TextComponent>
             </TouchableOpacity>
           );
         })}
@@ -270,7 +269,7 @@ export default function OrderScreen() {
         <View>
           {/* Switch row */}
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>{isSwitchOn ? 'เปิดรับออเดอร์อัตโนมัติ' : 'ปิดรับออเดอร์อัตโนมัติ'}</Text>
+            <TextComponent style={styles.switchLabel}>{isSwitchOn ? 'เปิดรับออเดอร์อัตโนมัติ' : 'ปิดรับออเดอร์อัตโนมัติ'}</TextComponent>
             <Switch
               value={isSwitchOn}
               onValueChange={setIsSwitchOn}
@@ -284,19 +283,19 @@ export default function OrderScreen() {
           {loading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#C42127" />
-              <Text style={styles.loadingText}>กำลังโหลดข้อมูล...</Text>
+              <TextComponent style={styles.loadingText}>กำลังโหลดข้อมูล...</TextComponent>
             </View>
           )}
 
           {/* Error state */}
           {error && !loading && (
             <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
+              <TextComponent style={styles.errorText}>{error}</TextComponent>
               <TouchableOpacity
                 style={styles.retryButton}
                 onPress={fetchCookOrders}
               >
-                <Text style={styles.retryButtonText}>ลองใหม่</Text>
+                <TextComponent style={styles.retryButtonText}>ลองใหม่</TextComponent>
               </TouchableOpacity>
             </View>
           )}
@@ -316,27 +315,27 @@ export default function OrderScreen() {
           {!loading && !error && orders.length === 0 && (
             <View style={{ marginBottom: 16 }}>
               <View style={styles.card}>
-                <Text style={styles.id}>ไม่มีออเดอร์</Text>
+                <TextComponent style={styles.id}>ไม่มีออเดอร์</TextComponent>
 
                 {/* Header row */}
                 <View style={styles.headerRow}>
-                  <Text style={[styles.headerText, { flex: 3, textAlign: 'left', paddingLeft: 20 }]}>รายการ</Text>
-                  <Text style={[styles.headerText, { flex: 2, textAlign: 'center' }]}>จำนวน</Text>
-                  <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>ราคา</Text>
+                  <TextComponent style={[styles.headerText, { flex: 3, textAlign: 'left', paddingLeft: 20 }]}>รายการ</TextComponent>
+                  <TextComponent style={[styles.headerText, { flex: 2, textAlign: 'center' }]}>จำนวน</TextComponent>
+                  <TextComponent style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>ราคา</TextComponent>
                 </View>
 
                 {/* Items - แสดงข้อความว่าไม่มีออเดอร์ */}
                 <ScrollView style={{ maxHeight: height * 0.43 }}>
                   <View style={styles.emptyMessageContainer}>
-                    <Text style={styles.emptyMessageText}>ยังไม่มีออเดอร์ที่ต้องทำ</Text>
-                    <Text style={styles.emptyMessageSubtext}>รอรับออเดอร์ใหม่จากลูกค้า</Text>
+                    <TextComponent style={styles.emptyMessageText}>ยังไม่มีออเดอร์ที่ต้องทำ</TextComponent>
+                    <TextComponent style={styles.emptyMessageSubtext}>รอรับออเดอร์ใหม่จากลูกค้า</TextComponent>
                   </View>
                 </ScrollView>
 
                 {/* Status */}
-                <Text style={[styles.status, { paddingLeft: 20 }]}>
+                <TextComponent style={[styles.status, { paddingLeft: 20 }]}>
                   รายละเอียดเพิ่มเติม : รอรับออเดอร์
-                </Text>
+                </TextComponent>
               </View>
 
               {/* Cancel button */}
@@ -344,7 +343,7 @@ export default function OrderScreen() {
                 style={[styles.cancelButton, { opacity: 0.5 }]}
                 disabled={true}
               >
-                <Text style={styles.cancelText}>ยกเลิก</Text>
+                <TextComponent style={styles.cancelText}>ยกเลิก</TextComponent>
               </TouchableOpacity>
 
               {/* Slide button */}
@@ -358,10 +357,10 @@ export default function OrderScreen() {
               {/* Summary */}
               <View style={styles.summaryContainer}>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryDone}>ออเดอร์ที่สำเร็จแล้ว: 0</Text>
-                  <Text style={styles.summaryPending}>ออเดอร์ที่เหลือ: 0</Text>
+                <TextComponent style={styles.summaryDone}>ออเดอร์ที่สำเร็จแล้ว: 0</TextComponent>
+                <TextComponent style={styles.summaryPending}>ออเดอร์ที่เหลือ: 0</TextComponent>
                 </View>
-                <Text style={styles.summaryTotal}>ออเดอร์ทั้งหมด: 0</Text>
+                <TextComponent style={styles.summaryTotal}>ออเดอร์ทั้งหมด: 0</TextComponent>
               </View>
             </View>
           )}

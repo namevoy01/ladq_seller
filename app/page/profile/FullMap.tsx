@@ -1,19 +1,14 @@
-import GoogleMap from "@/components/GoogleMap";
 import WebMap from "@/components/WebMap";
+import { useAuth } from "@/contexts/AuthContext";
+import { GetPosLocation, PostPosLocation } from "@/service/store";
 import { useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, SafeAreaView, StyleSheet, View } from "react-native";
-
-// Define minimal Region type locally to avoid importing native module types
-type Region = {
-  latitude: number;
-  longitude: number;
-  latitudeDelta: number;
-  longitudeDelta: number;
-};
+import React, { useEffect, useMemo, useState } from "react";
+import { Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function FullMap() {
+  const TH_CENTER = { latitude: 13.7563, longitude: 100.5018 };
   const params = useLocalSearchParams();
+  const { getBranchId } = useAuth();
 
   const { lat, lng, zoom } = useMemo(() => {
     const latNum = typeof params.lat === "string" ? parseFloat(params.lat) : 0;
@@ -22,48 +17,70 @@ export default function FullMap() {
     return { lat: isNaN(latNum) ? 0 : latNum, lng: isNaN(lngNum) ? 0 : lngNum, zoom: isNaN(zoomNum) ? 16 : zoomNum };
   }, [params]);
 
-  const screenHeight = Dimensions.get("window").height;
-
-  // interactive region + selected pin
-  const [region, setRegion] = useState<Region>({
-    latitude: lat || 13.7563,
-    longitude: lng || 100.5018,
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02 * 1.2,
+  const [currentLocation, setCurrentLocation] = useState({
+    latitude: lat || TH_CENTER.latitude,
+    longitude: lng || TH_CENTER.longitude,
   });
-  const [selected, setSelected] = useState<{ latitude: number; longitude: number }>({
-    latitude: region.latitude,
-    longitude: region.longitude,
-  });
-  const [mapErrored, setMapErrored] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
-  const readyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [pickedLocation, setPickedLocation] = useState(currentLocation);
 
-  // Fallback to static map if native map never becomes ready (gray screen cases)
   useEffect(() => {
-    if (mapErrored || mapReady) return;
-    readyTimeoutRef.current = setTimeout(() => {
-      if (!mapReady) setMapErrored(true);
-    }, 1500);
-    return () => {
-      if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
-    };
-  }, [mapReady, mapErrored]);
+    const branchId = getBranchId();
+    if (!branchId) return;
+    (async () => {
+      try {
+        const res = await GetPosLocation(branchId);
+        if (res && typeof res.Lat === "number" && typeof res.Lng === "number") {
+          const next = { latitude: res.Lat, longitude: res.Lng };
+          setCurrentLocation(next);
+          setPickedLocation(next);
+        }
+      } catch {
+        // ignore fetch errors
+      }
+    })();
+  }, [getBranchId]);
+
+  const handlePin = () => {
+    const lat = Number(pickedLocation.latitude.toFixed(4));
+    const lng = Number(pickedLocation.longitude.toFixed(4));
+
+    console.log("PIN_LOCATION:", {
+      latitude: lat,
+      longitude: lng,
+    });
+    // เรียก API ตามสเปก: POST /api/v1/Location/Pos
+    PostPosLocation({
+      lat,
+      lng,
+      province: 1,
+    })
+      .then(() => {
+        Alert.alert("สำเร็จ", "บันทึกตำแหน่งร้านเรียบร้อย");
+      })
+      .catch((err) => {
+        Alert.alert("ผิดพลาด", err?.message || "บันทึกตำแหน่งไม่สำเร็จ");
+      });
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={{ height: screenHeight, width: "100%", position: "relative" }}>
-        {/* Always render static map as background so user sees map immediately */}
-        <GoogleMap
-          latitude={selected.latitude}
-          longitude={selected.longitude}
-          zoom={zoom}
-          height={screenHeight}
-        />
-
-        {/* Overlay interactive web-based map (Leaflet + OSM) */}
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: "transparent" }]}>
-          <WebMap latitude={selected.latitude} longitude={selected.longitude} zoom={zoom} height={"100%"} />
+      <View style={styles.container}>
+        <View style={styles.mapArea}>
+          <WebMap
+            latitude={currentLocation.latitude}
+            longitude={currentLocation.longitude}
+            zoom={zoom}
+            height={"100%"}
+            searchEnabled
+            onLocationChange={(loc) =>
+              setPickedLocation({ latitude: loc.latitude, longitude: loc.longitude })
+            }
+          />
+        </View>
+        <View style={styles.pinBar}>
+          <TouchableOpacity style={styles.pinButton} activeOpacity={0.9} onPress={handlePin}>
+            <Text style={styles.pinButtonText}>ปักหมุด</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
@@ -73,7 +90,34 @@ export default function FullMap() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#f3f4f6",
+  },
+  container: {
+    flex: 1,
+  },
+  mapArea: {
+    flex: 1,
+    width: "100%",
+  },
+  pinBar: {
+    minHeight: 90,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+  },
+  pinButton: {
+    backgroundColor: "#C42127",
+    borderRadius: 999,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    elevation: 2,
+  },
+  pinButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
 

@@ -525,6 +525,76 @@ export const PostTimeSlot = async (payload: PostTimeSlotPayload) => {
     }
 };
 
+// -------- Location (POS) --------
+export interface PostPosLocationPayload {
+  lat: number;
+  lng: number;
+  province: number;
+}
+
+export const PostPosLocation = async (payload: PostPosLocationPayload) => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${BASE_URL}/Location/Pos`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`บันทึกตำแหน่งร้านไม่สำเร็จ: ${errText}`);
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (response.status === 204) return null as any;
+    if (contentType.includes("application/json")) {
+      return await response.json();
+    }
+    const text = await response.text();
+    return (text && text.length > 0 ? text : null) as any;
+  } catch (error) {
+    console.error('เกิดข้อผิดพลาดขณะบันทึกตำแหน่งร้าน (POST /Location/Pos):', error);
+    throw error;
+  }
+};
+
+// GET Location (POS)
+export interface GetPosLocationResponse {
+  Lat: number;
+  Lng: number;
+}
+
+export const GetPosLocation = async (branchId: string): Promise<GetPosLocationResponse | null> => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${BASE_URL}/Location/Pos/${branchId}`, {
+      method: "GET",
+      headers,
+      credentials: "include",
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`ดึงตำแหน่งร้านไม่สำเร็จ: ${errText}`);
+    }
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      return await response.json();
+    }
+    const text = await response.text();
+    if (!text) return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  } catch (error) {
+    console.error('เกิดข้อผิดพลาดขณะดึงตำแหน่งร้าน (GET /Location/Pos/:id):', error);
+    throw error;
+  }
+};
 export interface PostCreateMerchantPayload {
     branch_type: string;
     merchant_type: number[];
