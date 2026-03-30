@@ -4,6 +4,7 @@ import SendOrder from '@/app/page/order/SendOrder';
 import { useAuth } from '@/contexts/AuthContext';
 import { closeOrder, completeOrder, getCookOrders } from '@/service/order';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import { useRouter, type Href } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -72,6 +73,14 @@ export default function OrderScreen() {
   const [error, setError] = useState<string | null>(null);
   const [newOrderRefreshKey, setNewOrderRefreshKey] = useState(0);
   const [ws, setWs] = useState<WebSocket | null>(null);
+
+  // Prepare notification channel (Android) once
+  useEffect(() => {
+    Notifications.setNotificationChannelAsync("orders", {
+      name: "Orders",
+      importance: Notifications.AndroidImportance.HIGH,
+    }).catch(() => {});
+  }, []);
 
   // แปลงข้อมูลจาก API เป็น format ของ UI
   const transformApiOrderToUiOrder = useCallback((apiOrder: ApiOrder): Order => {
@@ -229,6 +238,14 @@ export default function OrderScreen() {
         const state = data.State || data.state;
         if (state === "NewOrder") {
           setNewOrderRefreshKey((prev) => prev + 1);
+          // Local notification: new order arrived
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: "มีออเดอร์เข้าแล้ว",
+              body: "มีออเดอร์ใหม่เข้ามาในระบบ",
+            },
+            trigger: null,
+          }).catch(() => {});
         } else if (state === "Cook") {
           // มีออเดอร์ cook เปลี่ยนสถานะ ให้รีเฟรชหน้าออเดอร์หลัก
           fetchCookOrders();

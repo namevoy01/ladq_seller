@@ -1,6 +1,6 @@
 import { useText } from "@/app/_layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { acceptOrder, cancelOrder, getNewOrdersPagination } from "@/service/order";
+import { acceptOrder, approveOrder, cancelOrder, getNewOrdersPagination } from "@/service/order";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -48,6 +48,7 @@ export default function NewOrder() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [originalItemIds, setOriginalItemIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(0);
@@ -88,6 +89,7 @@ export default function NewOrder() {
 
   const handleEdit = (order: Order) => {
     setSelectedOrder(order);
+    setOriginalItemIds(order.order_item.map((it) => it.order_item_id));
     setModalVisible(true);
   };
 
@@ -97,12 +99,23 @@ export default function NewOrder() {
     setSelectedOrder({ ...selectedOrder, order_item: updatedItems });
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!selectedOrder) return;
-    setOrders((prev) =>
-      prev.map((o) => (o.order_id === selectedOrder.order_id ? selectedOrder : o))
-    );
-    setModalVisible(false);
+    try {
+      // สร้าง payload: เมนูดั้งเดิมที่ยังอยู่ => isAvailable: true, ที่ถูกลบ => false
+      const currentIds = new Set((selectedOrder.order_item || []).map((it) => it.order_item_id));
+      const menus = originalItemIds.map((id) => ({
+        id,
+        isAvailable: currentIds.has(id),
+      }));
+      await approveOrder({ id: selectedOrder.order_id, menus });
+      Alert.alert("สำเร็จ", "บันทึกการแก้ไขออเดอร์แล้ว");
+      setModalVisible(false);
+      await fetchOrders(currentPage);
+    } catch (e) {
+      console.error("Error approving order:", e);
+      Alert.alert("ผิดพลาด", "บันทึกการแก้ไขออเดอร์ไม่สำเร็จ");
+    }
   };
 
   const handleCancel = () => setModalVisible(false);

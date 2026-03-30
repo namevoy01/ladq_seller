@@ -276,3 +276,39 @@ export const acceptOrder = async (id: string) => {
     throw error;
   }
 };
+
+// อนุมัติ/แก้ไขออเดอร์ใหม่ (Approve)
+export interface ApproveOrderPayload {
+  id: string; // order_id
+  menus: Array<{ id: string; isAvailable: boolean }>;
+}
+
+export const approveOrder = async (payload: ApproveOrderPayload) => {
+  try {
+    const response = await fetch(
+      `${BASE_URL}/Order/Pos/Approve`,
+      {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`HTTP error! status: ${response.status} - ${text}`);
+    }
+    const resText = await response.text();
+    if (!resText || resText.trim() === '') return { success: true };
+    try {
+      return JSON.parse(resText);
+    } catch {
+      return { success: true, message: resText };
+    }
+  } catch (error) {
+    console.error('Error approving order:', error);
+    throw error;
+  }
+};
