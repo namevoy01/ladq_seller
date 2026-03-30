@@ -175,14 +175,32 @@ export default function SettingMenu() {
         return;
       }
 
-      // API contract (multipart): { data: [ { ...menu fields..., options: [] } ], image: <file> }
+      // แปลง options จาก UI -> payload ของ Create Menu
+      const apiOptions = (menuOptions || []).map((opt) => ({
+        display: typeof opt.Display === "number" ? opt.Display : 0,
+        is_active: !!opt.IsActive,
+        is_required: !!opt.IsRequired,
+        max: Number.isFinite(opt.Max) ? opt.Max : 0,
+        min: Number.isFinite(opt.Min) ? opt.Min : 0,
+        name: opt.Name || "",
+        type: opt.Type || "single",
+        subs: (opt.SubOption || []).map((sub) => ({
+          display: typeof sub.Display === "number" ? sub.Display : 0,
+          is_active: !!sub.IsActive,
+          is_default: !!sub.IsDefault,
+          name: sub.Name || "",
+          price: Number.isFinite(sub.Price) ? sub.Price : 0,
+        })),
+      }));
+
+      // API contract (multipart): { data: [ { ...menu fields..., options } ], image: <file> }
       const payload = {
         data: [
           {
             category_id: Number(menuCategoryId) || 1,
             detail: menuDetail,
             name: menuName,
-            options: [],
+            options: apiOptions,
             price: Number(menuPrice),
           },
         ],

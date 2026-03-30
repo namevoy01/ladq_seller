@@ -397,6 +397,7 @@ export interface PutPosTimeSlotPayload {
     capacity: number;
     start_at: string; // HH:mm:ss
     end_at: string;   // HH:mm:ss
+    is_active: boolean;
 }
 
 // Update TimeSlot configuration for POS
@@ -451,6 +452,40 @@ export const GetPosInfo = async (): Promise<PosInfo> => {
         return await response.json();
     } catch (error) {
         console.error('เกิดข้อผิดพลาดขณะดึงข้อมูล POS:', error);
+        throw error;
+    }
+};
+
+export interface PutPosPayload {
+    name: string;
+    phone: string;
+    type: "mobile" | "fixed";
+}
+
+export const PutPosInfo = async (payload: PutPosPayload) => {
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${BASE_URL}/Pos`, {
+            method: "PUT",
+            headers,
+            credentials: "include",
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`อัปเดตข้อมูลร้าน (POS) ไม่สำเร็จ: ${errText}`);
+        }
+
+        const contentType = response.headers.get("content-type") || "";
+        if (response.status === 204) return null as any;
+        if (contentType.includes("application/json")) {
+            return await response.json();
+        }
+        const text = await response.text();
+        return (text && text.length > 0 ? text : null) as any;
+    } catch (error) {
+        console.error("เกิดข้อผิดพลาดขณะอัปเดตข้อมูล POS:", error);
         throw error;
     }
 };

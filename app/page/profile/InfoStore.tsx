@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { GetPosInfo } from '@/service/store';
+import { GetPosInfo, PutPosInfo } from '@/service/store';
 
 export default function InfoStore() {
   const [shopName, setShopName] = useState('');
   const [phone, setPhone] = useState('');
-  const [branchType, setBranchType] = useState('');
+  const [type, setType] = useState<'mobile' | 'fixed'>('mobile');
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -18,7 +19,8 @@ export default function InfoStore() {
         const pos = await GetPosInfo();
         setShopName(pos?.Name || '');
         setPhone(pos?.Phone || '');
-        setBranchType(pos?.BranchType || '');
+        const incomingType = String(pos?.BranchType || '').toLowerCase();
+        setType(incomingType === 'fixed' ? 'fixed' : 'mobile');
       } catch (e: any) {
         setError(e?.message || 'โหลดข้อมูลร้านไม่สำเร็จ');
       } finally {
@@ -28,8 +30,21 @@ export default function InfoStore() {
     loadPos();
   }, []);
 
-  const handleSave = () => {
-    setModalVisible(true);
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+      await PutPosInfo({
+        name: shopName.trim(),
+        phone: phone.trim(),
+        type,
+      });
+      setModalVisible(true);
+    } catch (e: any) {
+      setError(e?.message || 'บันทึกข้อมูลไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -54,16 +69,26 @@ export default function InfoStore() {
           keyboardType="phone-pad"
         />
 
-        <Text style={styles.label}>ประเภทร้าน (BranchType)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="เช่น mobile"
-          value={branchType}
-          onChangeText={setBranchType}
-        />
+        <Text style={styles.label}>ประเภท (type)</Text>
+        <View style={styles.typeRow}>
+          <TouchableOpacity
+            style={[styles.typeButton, type === 'mobile' && styles.typeButtonActive]}
+            onPress={() => setType('mobile')}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.typeButtonText, type === 'mobile' && styles.typeButtonTextActive]}>mobile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.typeButton, type === 'fixed' && styles.typeButtonActive]}
+            onPress={() => setType('fixed')}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.typeButtonText, type === 'fixed' && styles.typeButtonTextActive]}>fixed</Text>
+          </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85}>
-          <Text style={styles.saveText}>{loading ? 'กำลังโหลด...' : 'บันทึกข้อมูล'}</Text>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85} disabled={loading || saving}>
+          <Text style={styles.saveText}>{saving ? 'กำลังบันทึก...' : loading ? 'กำลังโหลด...' : 'บันทึกข้อมูล'}</Text>
         </TouchableOpacity>
 
         {!!error && <Text style={{ color: '#b91c1c', marginTop: 8 }}>{error}</Text>}
@@ -75,7 +100,7 @@ export default function InfoStore() {
             <Text style={styles.modalTitle}>บันทึกสำเร็จ!</Text>
             <Text style={styles.modalText}>
               ชื่อร้าน: {shopName}{'\n'}
-              ประเภทสาขา: {branchType || '-'}{'\n'}
+              ประเภท: {type}{'\n'}
               เบอร์โทร: {phone || '-'}
             </Text>
             <TouchableOpacity style={styles.modalButton} onPress={() => setModalVisible(false)} activeOpacity={0.85}>
@@ -109,6 +134,31 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#f9fafb',
     marginBottom: 12,
+  },
+  typeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  typeButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  typeButtonActive: {
+    backgroundColor: '#16a34a',
+    borderColor: '#16a34a',
+  },
+  typeButtonText: {
+    color: '#374151',
+    fontWeight: '600',
+  },
+  typeButtonTextActive: {
+    color: '#fff',
   },
   saveButton: { marginTop: 8, backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   saveText: { color: '#fff', fontWeight: '700', fontSize: 16 },

@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { GetTimeSlot, PutPosTimeSlot, PutPosTimeSlotPayload } from '@/service/store';
+import { GetTimeSlot, PostTimeSlot, PostTimeSlotPayload, PutPosTimeSlot, PutPosTimeSlotPayload } from '@/service/store';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
@@ -59,7 +59,17 @@ export default function ManageQueue() {
         }
         if (cfg) {
           if (typeof cfg.id === 'string') setConfigId(cfg.id);
-          setIsQueueOpen(!!cfg.is_active);
+          // รองรับค่า is_active หลายรูปแบบจาก backend: boolean | number | string
+          const normalizeIsActive = (value: any): boolean => {
+            if (typeof value === 'boolean') return value;
+            if (typeof value === 'number') return value === 1;
+            if (typeof value === 'string') {
+              const lowered = value.toLowerCase().trim();
+              return lowered === 'true' || lowered === '1' || lowered === 'active';
+            }
+            return false;
+          };
+          setIsQueueOpen(normalizeIsActive(cfg.is_active));
           // capacity -> จำนวนคิวสูงสุด
           if (typeof cfg.capacity === 'number' && cfg.capacity > 0) {
             setMaxQueue(cfg.capacity);
@@ -74,8 +84,9 @@ export default function ManageQueue() {
           // Parse start_at / end_at -> HH:mm
           const pickHHmm = (isoLike?: string): string => {
             if (!isoLike || typeof isoLike !== 'string') return '';
-            const m = isoLike.match(/T(\d{2}:\d{2}):\d{2}/);
-            return m ? m[1] : '';
+            // รองรับทั้งรูปแบบ "2025-01-01T08:30:00Z" และ "08:30:00"
+            const timeMatch = isoLike.match(/(\d{2}:\d{2}):\d{2}/);
+            return timeMatch ? timeMatch[1] : '';
           };
           setStartTime(pickHHmm(cfg.start_at));
           setEndTime(pickHHmm(cfg.end_at));
@@ -109,6 +120,7 @@ export default function ManageQueue() {
         capacity: Math.max(0, maxQueue | 0),
         start_at: startTime ? `${startTime}:00` : '00:00:00',
         end_at: endTime ? `${endTime}:00` : '23:59:59',
+        is_active: isQueueOpen,
       };
       await PutPosTimeSlot(payload);
       setModalVisible(true);
