@@ -1,8 +1,10 @@
 import { useText } from "@/app/_layout";
-import { getNewOrdersPagination } from "@/service/order";
+import { useAuth } from "@/contexts/AuthContext";
+import { cancelOrder, getNewOrdersPagination } from "@/service/order";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   ListRenderItemInfo,
   Modal,
@@ -42,6 +44,7 @@ interface ApiResponse {
 
 export default function NewOrder() {
   const Text = useText();
+  const { getBranchId } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -103,6 +106,23 @@ export default function NewOrder() {
   };
 
   const handleCancel = () => setModalVisible(false);
+
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      const branchId = getBranchId();
+      if (!branchId) {
+        Alert.alert("ผิดพลาด", "ไม่พบ branch_id กรุณาเข้าสู่ระบบใหม่");
+        return;
+      }
+
+      await cancelOrder(orderId, branchId);
+      Alert.alert("สำเร็จ", "ยกเลิกออเดอร์เรียบร้อย");
+      await fetchOrders(currentPage);
+    } catch (error) {
+      console.error("Error canceling order:", error);
+      Alert.alert("ผิดพลาด", "ยกเลิกออเดอร์ไม่สำเร็จ");
+    }
+  };
 
   const renderOrder = ({ item, index }: ListRenderItemInfo<Order>) => {
     const formatTime = (dateString: string) => {
@@ -196,7 +216,10 @@ export default function NewOrder() {
             >
               <RNText style={styles.buttonText}>แก้ไข</RNText>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={() => handleCancelOrder(item.order_id)}
+            >
               <RNText style={styles.buttonText}>ยกเลิก</RNText>
             </TouchableOpacity>
           </View>

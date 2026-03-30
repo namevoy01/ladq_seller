@@ -178,3 +178,41 @@ export const closeOrder = async (orderId: string) => {
     throw error;
   }
 };
+
+export const cancelOrder = async (orderId: string, branchId: string) => {
+  try {
+    const response = await fetch(
+      `${BASE_URL}/Order/Pos/Cancel`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+          branch_id: branchId,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const responseText = await response.text();
+    if (!responseText || responseText.trim() === '') {
+      return { success: true };
+    }
+
+    try {
+      return JSON.parse(responseText);
+    } catch (parseError) {
+      console.warn('Cancel response is not JSON, but status is OK:', responseText);
+      return { success: true, message: responseText };
+    }
+  } catch (error) {
+    console.error('Error canceling order:', error);
+    throw error;
+  }
+};
