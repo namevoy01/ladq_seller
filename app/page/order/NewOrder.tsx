@@ -238,12 +238,6 @@ export default function NewOrder() {
               <RNText style={styles.buttonText}>รับ</RNText>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, styles.editButton]}
-              onPress={() => handleEdit(item)}
-            >
-              <RNText style={styles.buttonText}>แก้ไข</RNText>
-            </TouchableOpacity>
-            <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
               onPress={() => handleCancelOrder(item.order_id)}
             >
